@@ -7,6 +7,9 @@ using UnityEngine.EventSystems;
 // カメラに付けた Physics Raycaster + シーン内の EventSystem が必要です。
 public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
 {
+    // 1回タップされた時に呼ばれます(吹き出しの表示/非表示切り替えなどに使えます)。
+    public event System.Action OnSingleTapped;
+
     // ダブルタップされた時に呼ばれます(設定パネルの開閉などに使えます)。
     public event System.Action OnDoubleTapped;
 
@@ -137,7 +140,11 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
 
     public void OnPointerClick(PointerEventData eventData)
     {
-        if (eventData.clickCount >= 2)
+        if (eventData.clickCount == 1)
+        {
+            OnSingleTapped?.Invoke();
+        }
+        else if (eventData.clickCount >= 2)
         {
             OnDoubleTapped?.Invoke();
         }

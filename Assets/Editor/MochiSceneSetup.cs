@@ -421,8 +421,12 @@ public static class MochiSceneSetup
 
         var so = new SerializedObject(followScript);
         so.FindProperty("target").objectReferenceValue = mochiTransform;
+        so.FindProperty("mochiBody").objectReferenceValue = mochiTransform != null ? mochiTransform.GetComponent<MochiBody>() : null;
         so.FindProperty("worldCamera").objectReferenceValue = worldCamera;
         so.ApplyModifiedPropertiesWithoutUndo();
+
+        // 普段は非表示にしておき、Mochiを1回タップした時だけ出す
+        bubbleGo.SetActive(false);
 
         return text;
     }
@@ -942,9 +946,7 @@ public static class MochiSceneSetup
             ? speechText.transform.parent.gameObject
             : (speechText != null ? speechText.gameObject : null);
 
-        var activeOnlyProp = so.FindProperty("activeOnlyObjects");
-        activeOnlyProp.arraySize = 1;
-        activeOnlyProp.GetArrayElementAtIndex(0).objectReferenceValue = speechBubble;
+        so.FindProperty("speechBubbleRoot").objectReferenceValue = speechBubble;
 
         so.ApplyModifiedPropertiesWithoutUndo();
     }

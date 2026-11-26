@@ -35,8 +35,8 @@ public class MochiAppController : MonoBehaviour
     [Tooltip("キャラのMochiBody。ダブルタップの検知に使います。")]
     [SerializeField] private MochiBody mochiBody;
 
-    [Tooltip("キャラが登場してから常に表示するもの(セリフの吹き出しなど)")]
-    [SerializeField] private GameObject[] activeOnlyObjects = new GameObject[0];
+    [Tooltip("セリフの吹き出し本体。キャラ登場時に一度だけ挨拶として表示します(以後はタップで開閉)")]
+    [SerializeField] private GameObject speechBubbleRoot;
 
     [Tooltip("キャラ登場時に最初にしゃべらせるセリフの表示先")]
     [SerializeField] private Text speechText;
@@ -79,7 +79,6 @@ public class MochiAppController : MonoBehaviour
             SetActive(categoryPanel, false);
             SetActive(okBarRoot, false);
             SetActive(mochiRoot, true);
-            SetActiveAll(activeOnlyObjects, true);
             if (weatherService != null) weatherService.enabled = wantWeather;
         }
         else
@@ -88,7 +87,7 @@ public class MochiAppController : MonoBehaviour
             ApplyCategoryVisibility(false);
             SetActive(okBarRoot, false);
             SetActive(mochiRoot, false);
-            SetActiveAll(activeOnlyObjects, false);
+            SetActive(speechBubbleRoot, false);
 
             if (wantWeatherToggle != null) wantWeatherToggle.isOn = wantWeather;
             if (wantHealthToggle != null) wantHealthToggle.isOn = wantHealth;
@@ -120,12 +119,12 @@ public class MochiAppController : MonoBehaviour
         SetActive(okBarRoot, false);
 
         SetActive(mochiRoot, true);
-        SetActiveAll(activeOnlyObjects, true);
 
         if (speechText != null)
         {
             speechText.text = "はじめまして!今日からお世話するね!";
         }
+        SetActive(speechBubbleRoot, true);
     }
 
     private void OnMochiDoubleTapped()
