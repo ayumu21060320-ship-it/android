@@ -6,7 +6,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.IntentFilter
+import android.os.BatteryManager
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
@@ -48,6 +51,7 @@ class OverlayService : Service() {
     private var talkCount = 0
 
     private val hideBubble = Runnable { setBubbleVisible(false) }
+    private var card: NotifyCard? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -69,11 +73,15 @@ class OverlayService : Service() {
         }
         if (mochi == null) showMochi()
         isRunning = true
+        instance = this
         return START_STICKY
     }
 
     override fun onDestroy() {
         isRunning = false
+        if (instance === this) instance = null
+        runCatching { unregisterReceiver(batteryReceiver) }
+        card?.dismiss()
         stopFling(save = true)
         handler.removeCallbacksAndMessages(null)
         bubble?.let { if (bubbleShown) runCatching { wm.removeView(it) } }
@@ -168,6 +176,12 @@ class OverlayService : Service() {
         bubbleParams = baseParams(touchable = false)
 
         if (prefs.driftEnabled) handler.postDelayed({ if (mochi != null) startFling(0f, 0f) }, 1500)
+
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_BATTERY_CHANGED)
+            addAction(Intent.ACTION_POWER_CONNECTED)
+        }
+        registerReceiver(batteryReceiver, filter)
 
         // 登場のあいさつ。天気のお世話を選んでいれば、続けて今日の天気も伝える。
         handler.postDelayed({ talk(MochiLines.greeting(prefs.masterName)) }, 400)
@@ -415,11 +429,11 @@ class OverlayService : Service() {
             add { talk(MochiLines.greeting(name)) }
             if (prefs.careWeather) add { talkWeather() }
             if (prefs.careCalorie) add { talk(CalorieStore(this@OverlayService).line(name)) }
+            if (prefs.careMoney) add { talk(MoneyStore(this@OverlayService).line(name)) }
         }
         val i = (talkCount - 1) % (topics.size + 1)
         when {
             i < topics.size -> topics[i]()
-            Random.nextInt(4) == 0 -> talk(MochiLines.comingSoon(prefs) ?: MochiLines.random(name))
             else -> talk(MochiLines.random(name))
         }
     }
@@ -437,6 +451,37 @@ class OverlayService : Service() {
         startActivity(
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
+    }
+
+    // ---------- 電池 ----------
+
+    private var lastBatteryWarn = 101
+
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (!prefs.batteryTalk) return
+            if (intent.action == Intent.ACTION_POWER_CONNECTED) {
+                if (lastBatteryWarn <= 20) talk("充電ありがとうございます、${prefs.masterName}！")
+                lastBatteryWarn = 101
+                return
+            }
+            val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+            val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+            val charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+            if (level < 0 || charging) return
+            val pct = level * 100 / scale
+            // 20% と 10% と 5% を下回った時に1回ずつ
+            val step = listOf(20, 10, 5).firstOrNull { pct <= it && lastBatteryWarn > it } ?: return
+            lastBatteryWarn = step
+            talk(
+                when (step) {
+                    20 -> "${prefs.masterName}、電池が残り${pct}%です。そろそろ充電しましょう！"
+                    10 -> "電池が${pct}%しかありません…！充電器はどこですか〜？"
+                    else -> "もう${pct}%です！このままだとわたし、消えちゃいます…！"
+                },
+            )
+        }
     }
 
     // ---------- 吹き出し ----------
@@ -498,6 +543,28 @@ class OverlayService : Service() {
         @Volatile
         var isRunning = false
             private set
+
+        @Volatile
+        private var instance: OverlayService? = null
+
+        /** ホーム画面に小さなカードを出して、メイドさんにもひと言しゃべってもらう */
+        fun showCard(spec: CardSpec, line: String?) {
+            val s = instance ?: return
+            s.handler.post {
+                val c = s.card ?: NotifyCard(s, s.wm).also { s.card = it }
+                c.show(spec)
+                if (line != null) { s.mochi?.react(); s.talk(line) }
+            }
+        }
+
+        /** ほかの場所(通知の読み取りなど)から、メイドさんにしゃべってもらう */
+        fun say(text: String) {
+            val s = instance ?: return
+            s.handler.post {
+                s.mochi?.react()
+                s.talk(text)
+            }
+        }
 
         fun start(context: Context) {
             context.startForegroundService(Intent(context, OverlayService::class.java))

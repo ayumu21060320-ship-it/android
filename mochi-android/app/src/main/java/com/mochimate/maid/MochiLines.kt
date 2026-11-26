@@ -57,14 +57,5 @@ object MochiLines {
     /** 長押しでアプリを開く時のセリフ */
     fun openSettings(name: String) = "設定を開きますね、${name}！"
 
-    /** まだ作っていないお世話を選んでいる時のセリフ */
-    fun comingSoon(prefs: Prefs): String? {
-        val list = buildList {
-            if (prefs.careMoney) add("家計簿")
-        }
-        if (list.isEmpty()) return null
-        return "${list.joinToString("と")}のお世話、いまお勉強中です！もう少し待っててくださいね。"
-    }
-
     private fun pick(vararg lines: String) = lines[Random.nextInt(lines.size)]
 }

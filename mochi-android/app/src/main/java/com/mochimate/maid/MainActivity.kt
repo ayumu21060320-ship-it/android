@@ -68,7 +68,16 @@ class MainActivity : Activity() {
             prefs.careCalorie = it
             openCalorie.visibility = if (it) View.VISIBLE else View.GONE
         }
-        bindCheck(R.id.careMoney, prefs.careMoney) { prefs.careMoney = it }
+        val openMoney = findViewById<Button>(R.id.openMoney)
+        openMoney.visibility = if (prefs.careMoney) View.VISIBLE else View.GONE
+        openMoney.setOnClickListener { startActivity(Intent(this, MoneyActivity::class.java)) }
+        bindCheck(R.id.careMoney, prefs.careMoney) {
+            prefs.careMoney = it
+            openMoney.visibility = if (it) View.VISIBLE else View.GONE
+        }
+        findViewById<Button>(R.id.openIntegration).setOnClickListener {
+            startActivity(Intent(this, IntegrationActivity::class.java))
+        }
 
         findViewById<Button>(R.id.grant).setOnClickListener {
             startActivity(

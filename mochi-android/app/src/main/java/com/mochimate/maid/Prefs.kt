@@ -22,6 +22,31 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("care_money", false)
         set(value) = sp.edit().putBoolean("care_money", value).apply()
 
+    /** 通知を教えてもらうアプリ(パッケージ名) */
+    var announceApps: Set<String>
+        get() = sp.getStringSet("announce_apps", emptySet())!!.toSet()
+        set(v) = sp.edit().putStringSet("announce_apps", v).apply()
+
+    /** 通知の本文まで読み上げるか(オフなら「誰から」だけ) */
+    var announceBody: Boolean
+        get() = sp.getBoolean("announce_body", false)
+        set(v) = sp.edit().putBoolean("announce_body", v).apply()
+
+    /** 支払い通知を家計簿に自動記録するアプリ */
+    var paymentApps: Set<String>
+        get() = sp.getStringSet("payment_apps", emptySet())!!.toSet()
+        set(v) = sp.edit().putStringSet("payment_apps", v).apply()
+
+    /** 通知をホーム画面の小さなカードで出すか(オフなら吹き出しだけ) */
+    var notifyCard: Boolean
+        get() = sp.getBoolean("notify_card", true)
+        set(v) = sp.edit().putBoolean("notify_card", v).apply()
+
+    /** 電池が少なくなったら教えてもらうか */
+    var batteryTalk: Boolean
+        get() = sp.getBoolean("battery_talk", true)
+        set(v) = sp.edit().putBoolean("battery_talk", v).apply()
+
     /** 勝手にふわふわ動き回るか */
     var driftEnabled: Boolean
         get() = sp.getBoolean("drift", true)

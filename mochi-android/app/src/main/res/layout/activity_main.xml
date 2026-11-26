@@ -105,7 +105,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="家計簿はもうすぐ使えるようになります"
+                android:text="選んだお世話のことを、タップした時に話してくれます"
                 android:textColor="@color/ink_sub"
                 android:textSize="13sp" />
 
@@ -194,9 +194,55 @@
                 android:id="@+id/careMoney"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="💰 家計簿をつけてほしい（準備中）"
+                android:text="💰 家計簿をつけてほしい"
                 android:textColor="@color/ink"
                 android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/openMoney"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginStart="32dp"
+                android:background="@drawable/button_sub_bg"
+                android:text="家計簿をひらく"
+                android:textColor="@color/accent"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- 連携 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/card_bg"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ほかのアプリと連携"
+                android:textColor="@color/ink"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="通知のお知らせ・支払いの自動記録・電池のお知らせ"
+                android:textColor="@color/ink_sub"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/openIntegration"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/button_sub_bg"
+                android:text="連携の設定"
+                android:textColor="@color/accent"
+                android:textStyle="bold" />
         </LinearLayout>
 
         <!-- 権限 -->
