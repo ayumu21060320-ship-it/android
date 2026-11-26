@@ -3,9 +3,6 @@ package com.mochimate.maid
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.RectF
 import android.util.TypedValue
 import android.widget.TextView
 
@@ -13,16 +10,10 @@ import android.widget.TextView
 class BubbleView(context: Context) : TextView(context) {
 
     private val density = resources.displayMetrics.density
-    private val tail = 10 * density
-    private val radius = 16 * density
     private val pad = (12 * density).toInt()
 
-    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
-    private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#E8738C"); style = Paint.Style.STROKE; strokeWidth = 2 * density
-    }
-    private val path = Path()
-    private val rect = RectF()
+    private val shape = BubbleShape(density)
+    private val tail = shape.tail
 
     /** しっぽの先の横位置(吹き出し内のpx)。負の値なら真ん中。 */
     var tailX = -1f
@@ -51,27 +42,7 @@ class BubbleView(context: Context) : TextView(context) {
     }
 
     override fun onDraw(canvas: Canvas) {
-        val w = width.toFloat()
-        val h = height.toFloat()
-        val inset = stroke.strokeWidth / 2
-        if (tailOnTop) rect.set(inset, tail, w - inset, h - inset)
-        else rect.set(inset, inset, w - inset, h - tail)
-
-        path.reset()
-        path.addRoundRect(rect, radius, radius, Path.Direction.CW)
-        val minX = radius + tail
-        val cx = if (tailX < 0 || w < minX * 2) w / 2 else tailX.coerceIn(minX, w - minX)
-        val tailPath = Path().apply {
-            if (tailOnTop) {
-                moveTo(cx - tail, tail + 1); lineTo(cx, inset); lineTo(cx + tail, tail + 1)
-            } else {
-                moveTo(cx - tail, h - tail - 1); lineTo(cx, h - inset); lineTo(cx + tail, h - tail - 1)
-            }
-            close()
-        }
-        path.op(tailPath, Path.Op.UNION)
-        canvas.drawPath(path, fill)
-        canvas.drawPath(path, stroke)
+        shape.draw(canvas, width.toFloat(), height.toFloat(), tailOnTop, tailX)
         super.onDraw(canvas)
     }
 }

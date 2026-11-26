@@ -37,10 +37,10 @@ class Prefs(context: Context) {
         get() = sp.getStringSet("payment_apps", emptySet())!!.toSet()
         set(v) = sp.edit().putStringSet("payment_apps", v).apply()
 
-    /** 通知をホーム画面の小さなカードで出すか(オフなら吹き出しだけ) */
-    var notifyCard: Boolean
-        get() = sp.getBoolean("notify_card", true)
-        set(v) = sp.edit().putBoolean("notify_card", v).apply()
+    /** お知らせを、吹き出しではなく画面の上のカードで出すか */
+    var cardAtTop: Boolean
+        get() = sp.getBoolean("card_at_top", false)
+        set(v) = sp.edit().putBoolean("card_at_top", v).apply()
 
     /** 電池が少なくなったら教えてもらうか */
     var batteryTalk: Boolean

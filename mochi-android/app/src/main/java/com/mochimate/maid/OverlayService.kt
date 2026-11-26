@@ -53,6 +53,19 @@ class OverlayService : Service() {
     private val hideBubble = Runnable { setBubbleVisible(false) }
     private var card: NotifyCard? = null
 
+    // ボタンやチップ付きの吹き出し(支払い・アラーム・通知)
+    private var rich: BubbleFrame? = null
+    private var richSpec: CardSpec? = null
+    private val richParams by lazy { baseParams(touchable = true) }
+    private val richDismiss = Runnable { dismissRich() }
+    private val alarmNudge = object : Runnable {
+        override fun run() {
+            if (rich == null) return
+            mochi?.react()
+            handler.postDelayed(this, 2500)
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -82,6 +95,7 @@ class OverlayService : Service() {
         if (instance === this) instance = null
         runCatching { unregisterReceiver(batteryReceiver) }
         card?.dismiss()
+        dismissRich(resume = false)
         stopFling(save = true)
         handler.removeCallbacksAndMessages(null)
         bubble?.let { if (bubbleShown) runCatching { wm.removeView(it) } }
@@ -239,6 +253,7 @@ class OverlayService : Service() {
                         mochiParams.y = (startY + dy).toInt().coerceIn(b.minY, b.maxY)
                         wm.updateViewLayout(v, mochiParams)
                         if (bubbleShown) positionBubble()
+                        positionRich()
                     }
                 }
                 MotionEvent.ACTION_UP -> {
@@ -362,6 +377,7 @@ class OverlayService : Service() {
                 mochiParams.y = ny
                 wm.updateViewLayout(m, mochiParams)
                 if (bubbleShown) positionBubble()
+                        positionRich()
             }
 
             // 勝手に動かない設定で、投げた勢いもなくなったら止める
@@ -421,6 +437,8 @@ class OverlayService : Service() {
     }
 
     private fun onTapped() {
+        // お知らせの吹き出しが出ている時は、タップで閉じる
+        if (rich != null) { dismissRich(); return }
         mochi?.react()
         val name = prefs.masterName
         talkCount++
@@ -487,6 +505,7 @@ class OverlayService : Service() {
     // ---------- 吹き出し ----------
 
     private fun talk(text: String) {
+        if (rich != null) dismissRich()
         val b = bubble ?: return
         b.text = text
         setBubbleVisible(true)
@@ -533,6 +552,70 @@ class OverlayService : Service() {
         if (bubbleShown) wm.updateViewLayout(b, bubbleParams)
     }
 
+    // ---------- お知らせの吹き出し ----------
+
+    private fun showRich(spec: CardSpec) {
+        if (mochi == null) return
+        dismissRich(resume = false)
+        setBubbleVisible(false)
+        handler.removeCallbacks(hideBubble)
+        // お知らせしている間は、その場で止まって待っている
+        stopFling(save = true)
+
+        val (sw, _) = screenSize()
+        val d = resources.displayMetrics.density
+        val frame = BubbleFrame(this)
+        frame.addView(CardContent.build(this, spec, onClose = { dismissRich() }, onTouched = { keepRich() }))
+        richParams.width = (280 * d).toInt().coerceAtMost(sw - (16 * d).toInt())
+        rich = frame
+        richSpec = spec
+        positionRich()
+        wm.addView(frame, richParams)
+        mochi?.react()
+        keepRich()
+        if (spec.sticky) handler.postDelayed(alarmNudge, 2500)
+    }
+
+    private fun keepRich() {
+        handler.removeCallbacks(richDismiss)
+        if (richSpec?.sticky != true) handler.postDelayed(richDismiss, 12_000)
+    }
+
+    private fun dismissRich(resume: Boolean = true) {
+        handler.removeCallbacks(richDismiss)
+        handler.removeCallbacks(alarmNudge)
+        val f = rich ?: return
+        runCatching { wm.removeView(f) }
+        rich = null
+        richSpec = null
+        if (resume && prefs.driftEnabled && mochi != null) startFling(0f, 0f)
+    }
+
+    /** お知らせの吹き出しを、メイドさんの頭の上(入りきらなければ足元)に置く */
+    private fun positionRich() {
+        val f = rich ?: return
+        val m = mochi ?: return
+        val (sw, sh) = screenSize()
+        val mochiW = m.width.takeIf { it > 0 } ?: m.measuredWidth
+        val mochiH = m.height.takeIf { it > 0 } ?: m.measuredHeight
+        f.tailOnTop = false
+        f.measure(
+            View.MeasureSpec.makeMeasureSpec(richParams.width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+        )
+        val bw = f.measuredWidth
+        val bh = f.measuredHeight
+        var y = mochiParams.y - bh + (mochiH * (MochiView.CONTENT_TOP - 0.02f)).toInt()
+        if (y < 0) {
+            f.tailOnTop = true
+            y = mochiParams.y + mochiH - (mochiH * 0.05f).toInt()
+        }
+        richParams.x = (mochiParams.x + mochiW / 2 - bw / 2).coerceIn(0, (sw - bw).coerceAtLeast(0))
+        richParams.y = y.coerceIn(0, (sh - bh).coerceAtLeast(0))
+        f.tailX = (mochiParams.x + mochiW / 2 - richParams.x).toFloat()
+        if (f.isAttachedToWindow) wm.updateViewLayout(f, richParams)
+    }
+
     companion object {
         private const val CHANNEL_ID = "mochi_overlay"
         private const val NOTIFICATION_ID = 1
@@ -548,12 +631,26 @@ class OverlayService : Service() {
         private var instance: OverlayService? = null
 
         /** ホーム画面に小さなカードを出して、メイドさんにもひと言しゃべってもらう */
-        fun showCard(spec: CardSpec, line: String?) {
+        /** お知らせを出す。ふだんはメイドさんの吹き出しで、設定によっては画面の上のカードで。 */
+        fun showCard(spec: CardSpec) {
             val s = instance ?: return
             s.handler.post {
-                val c = s.card ?: NotifyCard(s, s.wm).also { s.card = it }
-                c.show(spec)
-                if (line != null) { s.mochi?.react(); s.talk(line) }
+                if (s.prefs.cardAtTop) {
+                    val c = s.card ?: NotifyCard(s, s.wm).also { s.card = it }
+                    c.show(spec.copy(header = null))
+                    spec.header?.let { s.mochi?.react(); s.talk(it) }
+                } else {
+                    s.showRich(spec)
+                }
+            }
+        }
+
+        /** 元の通知が消えた時(アラームを止めた時など)に、お知らせも消す */
+        fun dismissTag(tag: String) {
+            val s = instance ?: return
+            s.handler.post {
+                if (s.richSpec?.tag == tag) s.dismissRich()
+                if (s.card?.tag == tag) s.card?.dismiss()
             }
         }
 

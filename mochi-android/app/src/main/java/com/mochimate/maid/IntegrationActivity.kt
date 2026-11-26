@@ -71,7 +71,7 @@ class IntegrationActivity : Activity() {
         // --- オプション ---
         val opt = card()
         opt.addView(title("お知らせのしかた"))
-        opt.addView(check("🪟 ホーム画面に小さなカードで出す", prefs.notifyCard) { prefs.notifyCard = it })
+        opt.addView(check("🪟 吹き出しではなく、画面の上にカードで出す", prefs.cardAtTop) { prefs.cardAtTop = it })
         opt.addView(check("通知の本文も教えてもらう（オフなら「誰から」だけ）", prefs.announceBody) { prefs.announceBody = it })
         opt.addView(check("🔋 電池が少なくなったら教えてもらう", prefs.batteryTalk) { prefs.batteryTalk = it })
         opt.addView(Button(this).apply {
@@ -87,6 +87,7 @@ class IntegrationActivity : Activity() {
                     CardSpec(
                         icon = getDrawable(R.mipmap.ic_launcher),
                         appLabel = "テスト ・ 家計簿に記録しました",
+                        header = "こんな感じでお知らせしますね！",
                         title = MoneyStore.yen(1280),
                         body = "セブン-イレブン 青葉通店",
                         chips = MoneyStore.CATEGORIES,
@@ -94,7 +95,6 @@ class IntegrationActivity : Activity() {
                         onChip = {},
                         onUndo = { OverlayService.say("取り消しておきました！") },
                     ),
-                    line = "こんな感じでお知らせしますね！",
                 )
                 // ホーム画面に戻って見てもらう
                 startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))

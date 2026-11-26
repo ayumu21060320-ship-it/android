@@ -50,69 +50,80 @@ class MochiNotificationListener : NotificationListenerService() {
                     val time = System.currentTimeMillis()
                     val category = MoneyStore.guessCategory(pay.store)
                     money.add(MoneyEntry(pay.amount, category, pay.store ?: label, time, label))
-                    val where = pay.store?.let { "（$it）" } ?: ""
-                    val line = "${label}で${MoneyStore.yen(pay.amount)}の支払い${where}、家計簿につけておきました！"
-                    if (prefs.notifyCard) {
-                        OverlayService.showCard(
-                            CardSpec(
-                                icon = appIcon(pkg),
-                                appLabel = "$label ・ 家計簿に記録しました",
-                                title = MoneyStore.yen(pay.amount),
-                                body = pay.store,
-                                chips = MoneyStore.CATEGORIES,
-                                selectedChip = category,
-                                onChip = { c -> MoneyStore(this).setCategory(time, c) },
-                                onUndo = {
-                                    MoneyStore(this).removeByTime(time)
-                                    OverlayService.say("取り消しておきました！")
-                                },
-                                onOpen = null,
-                            ),
-                            line = "${label}で払いましたね！",
-                        )
-                    } else {
-                        OverlayService.say(line)
-                    }
+                    OverlayService.showCard(
+                        CardSpec(
+                            icon = appIcon(pkg),
+                            appLabel = label,
+                            header = "${label}で払いましたね！家計簿につけておきました。",
+                            title = MoneyStore.yen(pay.amount),
+                            body = pay.store,
+                            chips = MoneyStore.CATEGORIES,
+                            selectedChip = category,
+                            onChip = { c -> MoneyStore(this).setCategory(time, c) },
+                            onUndo = {
+                                MoneyStore(this).removeByTime(time)
+                                OverlayService.say("取り消しておきました！")
+                            },
+                        ),
+                    )
                 }
                 return
             }
         }
 
-        if (pkg in prefs.announceApps && firstTime) {
-            // 同じアプリから立て続けに来た時は、少し間をあける(アラームは別)
-            val isAlarm = n.category == Notification.CATEGORY_ALARM
-            val now = System.currentTimeMillis()
-            if (!isAlarm && now - (lastAnnounce[pkg] ?: 0L) < 8_000) return
-            lastAnnounce[pkg] = now
-            val who = title?.takeIf { it.isNotBlank() }
-            val body = text?.replace('\n', ' ')?.let { if (it.length > 40) it.take(40) + "…" else it }
-            if (prefs.notifyCard) {
-                val open = n.contentIntent
-                OverlayService.showCard(
-                    CardSpec(
-                        icon = appIcon(pkg),
-                        appLabel = label,
-                        title = who ?: "${label}から通知です",
-                        body = if (prefs.announceBody) body else null,
-                        onOpen = open?.let { pi -> { sendIntent(pi) } },
-                    ),
-                    line = if (isAlarm) "${prefs.masterName}、アラームの時間ですよ〜！起きてください！"
-                    else "${label}から通知が来ましたよ！",
-                )
-            } else {
-                val msg = if (isAlarm) "${prefs.masterName}、アラームの時間ですよ〜！起きてください！" else buildString {
-                    append("${label}から通知です")
-                    if (who != null) append("、${who}")
-                    append("！")
-                    if (prefs.announceBody && !body.isNullOrBlank()) append("\n「$body」")
+        if (pkg !in prefs.announceApps || !firstTime) return
+
+        // アラーム: 鳴っている間ずっと吹き出しを出して、「止める」「スヌーズ」を押せるようにする
+        // 時計アプリによっては「アラーム」の印がないので、全画面で出る時計アプリの通知もアラームとみなす
+        val isAlarm = n.category == Notification.CATEGORY_ALARM ||
+            (pkg.contains("clock", ignoreCase = true) && n.fullScreenIntent != null)
+        if (isAlarm) {
+            val actions = n.actions.orEmpty().mapNotNull { a ->
+                val t = a.title?.toString() ?: return@mapNotNull null
+                when {
+                    STOP.containsMatchIn(t) -> "止める" to { sendIntent(a.actionIntent) }
+                    SNOOZE.containsMatchIn(t) -> "スヌーズ" to { sendIntent(a.actionIntent) }
+                    else -> null
                 }
-                OverlayService.say(msg)
-            }
+            }.distinctBy { it.first }
+            OverlayService.showCard(
+                CardSpec(
+                    icon = appIcon(pkg),
+                    appLabel = label,
+                    header = "${prefs.masterName}、アラームの時間ですよ〜！起きてください！",
+                    title = title?.takeIf { it.isNotBlank() } ?: "アラーム",
+                    body = text,
+                    actions = actions,
+                    onOpen = if (actions.isEmpty()) n.contentIntent?.let { pi -> { sendIntent(pi) } } else null,
+                    tag = sbn.key,
+                    sticky = true,
+                ),
+            )
+            return
         }
+
+        // 同じアプリから立て続けに来た時は、少し間をあける
+        val now = System.currentTimeMillis()
+        if (now - (lastAnnounce[pkg] ?: 0L) < 8_000) return
+        lastAnnounce[pkg] = now
+        val who = title?.takeIf { it.isNotBlank() }
+        val body = text?.replace('\n', ' ')?.let { if (it.length > 60) it.take(60) + "…" else it }
+        OverlayService.showCard(
+            CardSpec(
+                icon = appIcon(pkg),
+                appLabel = label,
+                header = "${label}から通知が来ましたよ！",
+                title = who ?: label,
+                body = if (prefs.announceBody) body else null,
+                onOpen = n.contentIntent?.let { pi -> { sendIntent(pi) } },
+                tag = sbn.key,
+            ),
+        )
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         seenKeys.remove(sbn.key)
+        OverlayService.dismissTag(sbn.key)
     }
 
     /** 通知をタップした時と同じように、そのアプリを開く */
@@ -130,6 +141,8 @@ class MochiNotificationListener : NotificationListenerService() {
 
     companion object {
         const val EXTRA_TEST = "com.mochimate.maid.TEST_PAYMENT"
+        private val STOP = Regex("解除|停止|止める|オフ|閉じる|dismiss|stop|turn off", RegexOption.IGNORE_CASE)
+        private val SNOOZE = Regex("スヌーズ|snooze|後で", RegexOption.IGNORE_CASE)
         private const val TEST_CHANNEL = "mochi_test"
 
         /** 支払いアプリのふりをした通知を出す(サブ機で連携を確かめる用) */
