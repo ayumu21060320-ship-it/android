@@ -23,6 +23,7 @@ public static class MochiSceneSetup
         Text speechText = EnsureSpeechCanvas();
         WeatherService weatherService = EnsureWeatherComponents(mochi, speechText);
         EnsureLocationUI(weatherService);
+        EnsureHealthPanel();
 
         Selection.activeGameObject = mochi;
         EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
@@ -431,5 +432,210 @@ public static class MochiSceneSetup
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
         return rect;
+    }
+
+    private static void EnsureHealthPanel()
+    {
+        GameObject canvasGo = GameObject.Find("HealthCanvas");
+        if (canvasGo == null)
+        {
+            canvasGo = new GameObject("HealthCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            Undo.RegisterCreatedObjectUndo(canvasGo, "Create HealthCanvas");
+
+            var canvas = canvasGo.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+
+            var scaler = canvasGo.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1080f, 1920f);
+        }
+
+        GameObject panel = EnsureChild(canvasGo, "HealthPanel", typeof(Image), typeof(VerticalLayoutGroup));
+        EnsureRect(panel, new Vector2(0.08f, 0.15f), new Vector2(0.92f, 0.85f));
+        panel.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.85f);
+
+        var layout = panel.GetComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(20, 20, 20, 20);
+        layout.spacing = 10f;
+        layout.childControlHeight = true;
+        layout.childControlWidth = true;
+        layout.childForceExpandHeight = false;
+        layout.childForceExpandWidth = true;
+
+        Text title = CreateLayoutText(panel, "TitleText", 70f, "健康管理", 36);
+
+        InputField weightField = CreateLayoutInputField(panel, "WeightInputField", 60f, "体重(kg)");
+        InputField heightField = CreateLayoutInputField(panel, "HeightInputField", 60f, "身長(cm)");
+        InputField ageField = CreateLayoutInputField(panel, "AgeInputField", 60f, "年齢");
+
+        Toggle isMaleToggle = CreateLayoutToggle(panel, "IsMaleToggle", 50f, "男性");
+
+        GameObject sliderGo = CreateLayoutChild(panel, "ActivitySlider", 50f, typeof(Slider));
+        Slider activitySlider = sliderGo.GetComponent<Slider>();
+        activitySlider.minValue = 0;
+        activitySlider.maxValue = 2;
+        activitySlider.wholeNumbers = true;
+        EnsureSliderVisuals(sliderGo);
+
+        Button saveButton = CreateLayoutButton(panel, "SaveProfileButton", 60f, "保存して計算");
+        Text calorieGoalText = CreateLayoutText(panel, "CalorieGoalText", 50f, "1日の目安: -- kcal", 28);
+
+        InputField foodNameField = CreateLayoutInputField(panel, "FoodNameInputField", 60f, "食べたもの");
+        InputField foodCaloriesField = CreateLayoutInputField(panel, "FoodCaloriesInputField", 60f, "カロリー(kcal)");
+        Button addFoodButton = CreateLayoutButton(panel, "AddFoodButton", 60f, "追加");
+
+        Text foodLogText = CreateLayoutText(panel, "FoodLogText", 300f, "今日の合計: 0kcal", 24);
+        foodLogText.alignment = TextAnchor.UpperLeft;
+
+        var userProfile = canvasGo.GetComponent<UserProfile>();
+        if (userProfile == null) userProfile = canvasGo.AddComponent<UserProfile>();
+
+        var foodLog = canvasGo.GetComponent<FoodLog>();
+        if (foodLog == null) foodLog = canvasGo.AddComponent<FoodLog>();
+
+        var healthPanel = canvasGo.GetComponent<HealthPanel>();
+        if (healthPanel == null) healthPanel = canvasGo.AddComponent<HealthPanel>();
+
+        var so = new SerializedObject(healthPanel);
+        so.FindProperty("userProfile").objectReferenceValue = userProfile;
+        so.FindProperty("foodLog").objectReferenceValue = foodLog;
+        so.FindProperty("weightInputField").objectReferenceValue = weightField;
+        so.FindProperty("heightInputField").objectReferenceValue = heightField;
+        so.FindProperty("ageInputField").objectReferenceValue = ageField;
+        so.FindProperty("isMaleToggle").objectReferenceValue = isMaleToggle;
+        so.FindProperty("activitySlider").objectReferenceValue = activitySlider;
+        so.FindProperty("saveProfileButton").objectReferenceValue = saveButton;
+        so.FindProperty("calorieGoalText").objectReferenceValue = calorieGoalText;
+        so.FindProperty("foodNameInputField").objectReferenceValue = foodNameField;
+        so.FindProperty("foodCaloriesInputField").objectReferenceValue = foodCaloriesField;
+        so.FindProperty("addFoodButton").objectReferenceValue = addFoodButton;
+        so.FindProperty("foodLogText").objectReferenceValue = foodLogText;
+        so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    private static GameObject CreateLayoutChild(GameObject parent, string name, float preferredHeight, params System.Type[] components)
+    {
+        GameObject go = EnsureChild(parent, name, components);
+
+        var layoutElement = go.GetComponent<LayoutElement>();
+        if (layoutElement == null) layoutElement = go.AddComponent<LayoutElement>();
+        layoutElement.preferredHeight = preferredHeight;
+        layoutElement.flexibleWidth = 1f;
+
+        return go;
+    }
+
+    private static Text CreateLayoutText(GameObject parent, string name, float height, string defaultText, int fontSize)
+    {
+        GameObject go = CreateLayoutChild(parent, name, height, typeof(Text));
+        var text = go.GetComponent<Text>();
+        text.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
+        text.fontSize = fontSize;
+        text.alignment = TextAnchor.MiddleCenter;
+        text.color = Color.black;
+        if (string.IsNullOrEmpty(text.text)) text.text = defaultText;
+        return text;
+    }
+
+    private static InputField CreateLayoutInputField(GameObject parent, string name, float height, string placeholder)
+    {
+        GameObject go = CreateLayoutChild(parent, name, height, typeof(InputField), typeof(Image));
+        go.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.95f);
+
+        GameObject placeholderGo = EnsureChild(go, "Placeholder", typeof(Text));
+        EnsureRect(placeholderGo, Vector2.zero, Vector2.one);
+        var placeholderText = placeholderGo.GetComponent<Text>();
+        placeholderText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
+        placeholderText.text = placeholder;
+        placeholderText.color = new Color(0f, 0f, 0f, 0.5f);
+        placeholderText.alignment = TextAnchor.MiddleLeft;
+
+        GameObject textGo = EnsureChild(go, "Text", typeof(Text));
+        EnsureRect(textGo, Vector2.zero, Vector2.one);
+        var text = textGo.GetComponent<Text>();
+        text.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
+        text.color = Color.black;
+        text.alignment = TextAnchor.MiddleLeft;
+
+        var inputField = go.GetComponent<InputField>();
+        inputField.textComponent = text;
+        inputField.placeholder = placeholderText;
+        return inputField;
+    }
+
+    private static Button CreateLayoutButton(GameObject parent, string name, float height, string label)
+    {
+        GameObject go = CreateLayoutChild(parent, name, height, typeof(Button), typeof(Image));
+        go.GetComponent<Image>().color = new Color(0.3f, 0.6f, 0.9f);
+
+        GameObject textGo = EnsureChild(go, "Text", typeof(Text));
+        EnsureRect(textGo, Vector2.zero, Vector2.one);
+        var text = textGo.GetComponent<Text>();
+        text.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
+        text.text = label;
+        text.color = Color.white;
+        text.alignment = TextAnchor.MiddleCenter;
+
+        return go.GetComponent<Button>();
+    }
+
+    private static Toggle CreateLayoutToggle(GameObject parent, string name, float height, string label)
+    {
+        GameObject go = CreateLayoutChild(parent, name, height, typeof(Toggle));
+
+        GameObject bgGo = EnsureChild(go, "Background", typeof(Image));
+        EnsureRect(bgGo, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f));
+        bgGo.GetComponent<RectTransform>().sizeDelta = new Vector2(40f, 40f);
+        bgGo.GetComponent<Image>().color = Color.white;
+
+        GameObject checkGo = EnsureChild(bgGo, "Checkmark", typeof(Image));
+        EnsureRect(checkGo, Vector2.zero, Vector2.one);
+        checkGo.GetComponent<Image>().color = new Color(0.3f, 0.6f, 0.9f);
+
+        GameObject labelGo = EnsureChild(go, "Label", typeof(Text));
+        var labelRect = labelGo.GetComponent<RectTransform>();
+        labelRect.anchorMin = new Vector2(0f, 0f);
+        labelRect.anchorMax = new Vector2(1f, 1f);
+        labelRect.offsetMin = new Vector2(50f, 0f);
+        labelRect.offsetMax = Vector2.zero;
+        var labelText = labelGo.GetComponent<Text>();
+        labelText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
+        labelText.text = label;
+        labelText.color = Color.black;
+        labelText.alignment = TextAnchor.MiddleLeft;
+
+        var toggle = go.GetComponent<Toggle>();
+        toggle.targetGraphic = bgGo.GetComponent<Image>();
+        toggle.graphic = checkGo.GetComponent<Image>();
+        return toggle;
+    }
+
+    private static void EnsureSliderVisuals(GameObject sliderGo)
+    {
+        var slider = sliderGo.GetComponent<Slider>();
+        if (slider.fillRect != null && slider.handleRect != null) return;
+
+        GameObject bgGo = EnsureChild(sliderGo, "Background", typeof(Image));
+        EnsureRect(bgGo, Vector2.zero, Vector2.one);
+        bgGo.GetComponent<Image>().color = new Color(0.8f, 0.8f, 0.8f);
+
+        GameObject fillAreaGo = EnsureChild(sliderGo, "Fill Area", typeof(RectTransform));
+        EnsureRect(fillAreaGo, Vector2.zero, Vector2.one);
+
+        GameObject fillGo = EnsureChild(fillAreaGo, "Fill", typeof(Image));
+        EnsureRect(fillGo, Vector2.zero, Vector2.one);
+        fillGo.GetComponent<Image>().color = new Color(0.3f, 0.6f, 0.9f);
+
+        GameObject handleAreaGo = EnsureChild(sliderGo, "Handle Slide Area", typeof(RectTransform));
+        EnsureRect(handleAreaGo, Vector2.zero, Vector2.one);
+
+        GameObject handleGo = EnsureChild(handleAreaGo, "Handle", typeof(Image));
+        var handleRect = handleGo.GetComponent<RectTransform>();
+        handleRect.sizeDelta = new Vector2(30f, 0f);
+        handleGo.GetComponent<Image>().color = Color.white;
+
+        slider.targetGraphic = handleGo.GetComponent<Image>();
+        slider.fillRect = fillGo.GetComponent<RectTransform>();
+        slider.handleRect = handleGo.GetComponent<RectTransform>();
     }
 }
