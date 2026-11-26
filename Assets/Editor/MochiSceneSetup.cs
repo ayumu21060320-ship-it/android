@@ -1,11 +1,11 @@
-using UnityEditor;
+﻿using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-// Unityエディタのメニュー「Mochi > Setup Scene」から実行する、
-// Mochiキャラのシーン構成(カメラ設定・本体・顔・スクリプトのアタッチ)を自動で行うツールです。
+// Unity繧ｨ繝・ぅ繧ｿ縺ｮ繝｡繝九Η繝ｼ縲勲ochi > Setup Scene縲阪°繧牙ｮ溯｡後☆繧九・
+// Mochi繧ｭ繝｣繝ｩ縺ｮ繧ｷ繝ｼ繝ｳ讒区・(繧ｫ繝｡繝ｩ險ｭ螳壹・譛ｬ菴薙・鬘斐・繧ｹ繧ｯ繝ｪ繝励ヨ縺ｮ繧｢繧ｿ繝・メ)繧定・蜍輔〒陦後≧繝・・繝ｫ縺ｧ縺吶・
 public static class MochiSceneSetup
 {
     [MenuItem("Mochi/Setup Scene")]
@@ -29,7 +29,7 @@ public static class MochiSceneSetup
         Selection.activeGameObject = mochi;
         EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
 
-        Debug.Log("Mochiシーンのセットアップが完了しました。Playボタンでつついて確認してください。");
+        Debug.Log("Mochi繧ｷ繝ｼ繝ｳ縺ｮ繧ｻ繝・ヨ繧｢繝・・縺悟ｮ御ｺ・＠縺ｾ縺励◆縲１lay繝懊ち繝ｳ縺ｧ縺､縺､縺・※遒ｺ隱阪＠縺ｦ縺上□縺輔＞縲・);
     }
 
     private static void EnsureEventSystem()
@@ -77,7 +77,7 @@ public static class MochiSceneSetup
         Shader shader = Shader.Find("Universal Render Pipeline/Lit");
         if (shader == null)
         {
-            Debug.LogWarning("Universal Render Pipeline/Lit シェーダーが見つかりませんでした。デフォルトのマテリアルのままにします。");
+            Debug.LogWarning("Universal Render Pipeline/Lit 繧ｷ繧ｧ繝ｼ繝繝ｼ縺瑚ｦ九▽縺九ｊ縺ｾ縺帙ｓ縺ｧ縺励◆縲ゅョ繝輔か繝ｫ繝医・繝槭ユ繝ｪ繧｢繝ｫ縺ｮ縺ｾ縺ｾ縺ｫ縺励∪縺吶・);
             return null;
         }
 
@@ -129,7 +129,7 @@ public static class MochiSceneSetup
         var sr = face.GetComponent<SpriteRenderer>();
         if (sr.sprite == null)
         {
-            // 顔のイラストを入れるまでの仮表示(Unity標準の円スプライト)
+            // 鬘斐・繧､繝ｩ繧ｹ繝医ｒ蜈･繧後ｋ縺ｾ縺ｧ縺ｮ莉ｮ陦ｨ遉ｺ(Unity讓呎ｺ悶・蜀・せ繝励Λ繧､繝・
             sr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
         }
 
@@ -152,7 +152,7 @@ public static class MochiSceneSetup
             visor = existing.gameObject;
         }
 
-        // 顔(Face)のすぐ後ろに、少し大きい濃紺の円を置いてヘルメットのバイザー風に見せる
+        // 鬘・Face)縺ｮ縺吶＄蠕後ｍ縺ｫ縲∝ｰ代＠螟ｧ縺阪＞豼・ｴｺ縺ｮ蜀・ｒ鄂ｮ縺・※繝倥Ν繝｡繝・ヨ縺ｮ繝舌う繧ｶ繝ｼ鬚ｨ縺ｫ隕九○繧・
         visor.transform.localPosition = new Vector3(0f, 0f, -0.45f);
         visor.transform.localScale = new Vector3(0.4f, 0.4f, 0.4f);
 
@@ -287,13 +287,13 @@ public static class MochiSceneSetup
         rect.offsetMax = Vector2.zero;
 
         var text = textGo.GetComponent<Text>();
-        text.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
+        text.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
         text.fontSize = 48;
         text.alignment = TextAnchor.MiddleCenter;
         text.color = Color.black;
         if (string.IsNullOrEmpty(text.text))
         {
-            text.text = "天気を取得中...";
+            text.text = "螟ｩ豌励ｒ蜿門ｾ嶺ｸｭ...";
         }
 
         return text;
@@ -353,7 +353,7 @@ public static class MochiSceneSetup
 
         var panelRect = EnsureRect(panel, new Vector2(0.1f, 0.03f), new Vector2(0.9f, 0.12f));
 
-        // 入力欄
+        // 蜈･蜉帶ｬ・
         GameObject inputGo = EnsureChild(panel, "CityInputField", typeof(InputField), typeof(Image));
         EnsureRect(inputGo, new Vector2(0f, 0f), new Vector2(0.65f, 1f));
         var inputField = inputGo.GetComponent<InputField>();
@@ -363,22 +363,22 @@ public static class MochiSceneSetup
         GameObject placeholderGo = EnsureChild(inputGo, "Placeholder", typeof(Text));
         EnsureRect(placeholderGo, Vector2.zero, Vector2.one);
         var placeholderText = placeholderGo.GetComponent<Text>();
-        placeholderText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
-        placeholderText.text = "街の名前を入力(例: Tokyo)";
+        placeholderText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
+        placeholderText.text = "陦励・蜷榊燕繧貞・蜉・萓・ Tokyo)";
         placeholderText.color = new Color(0f, 0f, 0f, 0.5f);
         placeholderText.alignment = TextAnchor.MiddleLeft;
 
         GameObject inputTextGo = EnsureChild(inputGo, "Text", typeof(Text));
         EnsureRect(inputTextGo, Vector2.zero, Vector2.one);
         var inputText = inputTextGo.GetComponent<Text>();
-        inputText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
+        inputText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
         inputText.color = Color.black;
         inputText.alignment = TextAnchor.MiddleLeft;
 
         inputField.textComponent = inputText;
         inputField.placeholder = placeholderText;
 
-        // 検索ボタン
+        // 讀懃ｴ｢繝懊ち繝ｳ
         GameObject buttonGo = EnsureChild(panel, "SearchButton", typeof(Button), typeof(Image));
         EnsureRect(buttonGo, new Vector2(0.7f, 0f), new Vector2(1f, 1f));
         var buttonImage = buttonGo.GetComponent<Image>();
@@ -387,16 +387,16 @@ public static class MochiSceneSetup
         GameObject buttonTextGo = EnsureChild(buttonGo, "Text", typeof(Text));
         EnsureRect(buttonTextGo, Vector2.zero, Vector2.one);
         var buttonText = buttonTextGo.GetComponent<Text>();
-        buttonText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
-        buttonText.text = "検索";
+        buttonText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
+        buttonText.text = "讀懃ｴ｢";
         buttonText.color = Color.white;
         buttonText.alignment = TextAnchor.MiddleCenter;
 
-        // ステータス表示(入力欄の少し下)
+        // 繧ｹ繝・・繧ｿ繧ｹ陦ｨ遉ｺ(蜈･蜉帶ｬ・・蟆代＠荳・
         GameObject statusGo = EnsureChild(canvasGo, "LocationStatusText", typeof(Text));
         EnsureRect(statusGo, new Vector2(0.1f, -0.02f), new Vector2(0.9f, 0.03f));
         var statusText = statusGo.GetComponent<Text>();
-        statusText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
+        statusText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
         statusText.fontSize = 28;
         statusText.alignment = TextAnchor.MiddleCenter;
         statusText.color = Color.black;
@@ -465,13 +465,13 @@ public static class MochiSceneSetup
         layout.childForceExpandHeight = false;
         layout.childForceExpandWidth = true;
 
-        Text title = CreateLayoutText(panel, "TitleText", 70f, "健康管理", 36);
+        Text title = CreateLayoutText(panel, "TitleText", 70f, "蛛･蠎ｷ邂｡逅・, 36);
 
-        InputField weightField = CreateLayoutInputField(panel, "WeightInputField", 60f, "体重(kg)");
-        InputField heightField = CreateLayoutInputField(panel, "HeightInputField", 60f, "身長(cm)");
-        InputField ageField = CreateLayoutInputField(panel, "AgeInputField", 60f, "年齢");
+        InputField weightField = CreateLayoutInputField(panel, "WeightInputField", 60f, "菴馴㍾(kg)");
+        InputField heightField = CreateLayoutInputField(panel, "HeightInputField", 60f, "霄ｫ髟ｷ(cm)");
+        InputField ageField = CreateLayoutInputField(panel, "AgeInputField", 60f, "蟷ｴ鮨｢");
 
-        Toggle isMaleToggle = CreateLayoutToggle(panel, "IsMaleToggle", 50f, "男性");
+        Toggle isMaleToggle = CreateLayoutToggle(panel, "IsMaleToggle", 50f, "逕ｷ諤ｧ");
 
         GameObject sliderGo = CreateLayoutChild(panel, "ActivitySlider", 50f, typeof(Slider));
         Slider activitySlider = sliderGo.GetComponent<Slider>();
@@ -480,17 +480,17 @@ public static class MochiSceneSetup
         activitySlider.wholeNumbers = true;
         EnsureSliderVisuals(sliderGo);
 
-        Button saveButton = CreateLayoutButton(panel, "SaveProfileButton", 60f, "保存して計算");
-        Text calorieGoalText = CreateLayoutText(panel, "CalorieGoalText", 50f, "1日の目安: -- kcal", 28);
+        Button saveButton = CreateLayoutButton(panel, "SaveProfileButton", 60f, "菫晏ｭ倥＠縺ｦ險育ｮ・);
+        Text calorieGoalText = CreateLayoutText(panel, "CalorieGoalText", 50f, "1譌･縺ｮ逶ｮ螳・ -- kcal", 28);
 
-        InputField foodNameField = CreateLayoutInputField(panel, "FoodNameInputField", 60f, "食べたもの");
-        InputField foodCaloriesField = CreateLayoutInputField(panel, "FoodCaloriesInputField", 60f, "カロリー(kcal)");
-        Button addFoodButton = CreateLayoutButton(panel, "AddFoodButton", 60f, "追加");
+        InputField foodNameField = CreateLayoutInputField(panel, "FoodNameInputField", 60f, "鬟溘∋縺溘ｂ縺ｮ");
+        InputField foodCaloriesField = CreateLayoutInputField(panel, "FoodCaloriesInputField", 60f, "繧ｫ繝ｭ繝ｪ繝ｼ(kcal)");
+        Button addFoodButton = CreateLayoutButton(panel, "AddFoodButton", 60f, "霑ｽ蜉");
 
-        Text foodLogText = CreateLayoutText(panel, "FoodLogText", 300f, "今日の合計: 0kcal", 24);
+        Text foodLogText = CreateLayoutText(panel, "FoodLogText", 300f, "莉頑律縺ｮ蜷郁ｨ・ 0kcal", 24);
         foodLogText.alignment = TextAnchor.UpperLeft;
 
-        Button okButton = CreateLayoutButton(panel, "OkButton", 80f, "はじめる");
+        Button okButton = CreateLayoutButton(panel, "OkButton", 80f, "縺ｯ縺倥ａ繧・);
         okButton.GetComponent<Image>().color = new Color(0.95f, 0.6f, 0.2f);
 
         var userProfile = canvasGo.GetComponent<UserProfile>();
@@ -537,7 +537,7 @@ public static class MochiSceneSetup
     {
         GameObject go = CreateLayoutChild(parent, name, height, typeof(Text));
         var text = go.GetComponent<Text>();
-        text.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
+        text.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
         text.fontSize = fontSize;
         text.alignment = TextAnchor.MiddleCenter;
         text.color = Color.black;
@@ -553,7 +553,7 @@ public static class MochiSceneSetup
         GameObject placeholderGo = EnsureChild(go, "Placeholder", typeof(Text));
         EnsureRect(placeholderGo, Vector2.zero, Vector2.one);
         var placeholderText = placeholderGo.GetComponent<Text>();
-        placeholderText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
+        placeholderText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
         placeholderText.text = placeholder;
         placeholderText.color = new Color(0f, 0f, 0f, 0.5f);
         placeholderText.alignment = TextAnchor.MiddleLeft;
@@ -561,7 +561,7 @@ public static class MochiSceneSetup
         GameObject textGo = EnsureChild(go, "Text", typeof(Text));
         EnsureRect(textGo, Vector2.zero, Vector2.one);
         var text = textGo.GetComponent<Text>();
-        text.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
+        text.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
         text.color = Color.black;
         text.alignment = TextAnchor.MiddleLeft;
 
@@ -579,7 +579,7 @@ public static class MochiSceneSetup
         GameObject textGo = EnsureChild(go, "Text", typeof(Text));
         EnsureRect(textGo, Vector2.zero, Vector2.one);
         var text = textGo.GetComponent<Text>();
-        text.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
+        text.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
         text.text = label;
         text.color = Color.white;
         text.alignment = TextAnchor.MiddleCenter;
@@ -607,7 +607,7 @@ public static class MochiSceneSetup
         labelRect.offsetMin = new Vector2(50f, 0f);
         labelRect.offsetMax = Vector2.zero;
         var labelText = labelGo.GetComponent<Text>();
-        labelText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
+        labelText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
         labelText.text = label;
         labelText.color = Color.black;
         labelText.alignment = TextAnchor.MiddleLeft;
