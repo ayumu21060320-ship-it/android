@@ -48,6 +48,8 @@ public static class MochiSceneSetup
         PlayerSettings.allowedAutorotateToLandscapeLeft = false;
         PlayerSettings.allowedAutorotateToLandscapeRight = false;
 
+        SetGameViewToPortrait();
+
         EnsureEventSystem();
         Camera cam = EnsureCamera();
         Material mochiMat = EnsureMochiMaterial();
@@ -67,6 +69,59 @@ public static class MochiSceneSetup
         EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
 
         Debug.Log("Mochiシーンのセットアップが完了しました。Playボタンでつついて確認してください。");
+    }
+
+    [MenuItem("Mochi/Set Game View To Portrait")]
+    public static void SetGameViewToPortrait()
+    {
+        try
+        {
+            const string sizeName = "Mochi Portrait (1080x1920)";
+
+            var assembly = typeof(Editor).Assembly;
+            var sizesType = assembly.GetType("UnityEditor.GameViewSizes");
+            var groupTypeEnum = assembly.GetType("UnityEditor.GameViewSizeGroupType");
+            var groupClassType = assembly.GetType("UnityEditor.GameViewSizeGroup");
+            var sizeClassType = assembly.GetType("UnityEditor.GameViewSize");
+            var sizeTypeEnum = assembly.GetType("UnityEditor.GameViewSizeType");
+            var gameViewType = assembly.GetType("UnityEditor.GameView");
+
+            var singletonType = typeof(ScriptableSingleton<>).MakeGenericType(sizesType);
+            object sizesInstance = singletonType.GetProperty("instance").GetValue(null, null);
+
+            object currentGroupType = sizesType.GetProperty("currentGroupType").GetValue(sizesInstance, null);
+            object group = sizesType.GetMethod("GetGroup").Invoke(sizesInstance, new[] { currentGroupType });
+
+            var getDisplayTexts = groupClassType.GetMethod("GetDisplayTexts");
+            string[] displayTexts = (string[])getDisplayTexts.Invoke(group, null);
+
+            int index = System.Array.FindIndex(displayTexts, t => t.StartsWith(sizeName));
+
+            if (index < 0)
+            {
+                object fixedResolution = System.Enum.Parse(sizeTypeEnum, "FixedResolution");
+                var ctor = sizeClassType.GetConstructor(new[] { sizeTypeEnum, typeof(int), typeof(int), typeof(string) });
+                object newSize = ctor.Invoke(new object[] { fixedResolution, 1080, 1920, sizeName });
+
+                groupClassType.GetMethod("AddCustomSize").Invoke(group, new[] { newSize });
+
+                displayTexts = (string[])getDisplayTexts.Invoke(group, null);
+                index = System.Array.FindIndex(displayTexts, t => t.StartsWith(sizeName));
+            }
+
+            if (index >= 0)
+            {
+                EditorWindow gameView = EditorWindow.GetWindow(gameViewType);
+                var selectedSizeIndexProp = gameViewType.GetProperty(
+                    "selectedSizeIndex",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+                selectedSizeIndexProp.SetValue(gameView, index, null);
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning("Game viewを自動で縦長にできませんでした。手動でGameタブの解像度を縦長に切り替えてください: " + e.Message);
+        }
     }
 
     private static void EnsureEventSystem()
