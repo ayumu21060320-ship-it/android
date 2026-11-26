@@ -30,11 +30,14 @@
                 android:value="desktop_mate_overlay_character" />
         </service>
 
-        <!-- Unityの描画そのものをホーム画面に浮かべる本格版サービス -->
+        <!-- Unityの描画そのものをホーム画面に浮かべる本格版サービス。
+             android:processで別プロセスにして、アプリ本体のUnityと同じメモリ空間で
+             2つ同時に動いて衝突・クラッシュするのを防ぐ。 -->
         <service
             android:name="com.mochimate.overlay.MochiUnityOverlayService"
             android:enabled="true"
             android:exported="false"
+            android:process=":overlay"
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
