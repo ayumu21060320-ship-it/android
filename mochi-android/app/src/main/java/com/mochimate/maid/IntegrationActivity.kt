@@ -101,6 +101,29 @@ class IntegrationActivity : Activity() {
             }
         }, LinearLayout.LayoutParams(-1, px(44)).apply { topMargin = px(8) })
 
+        opt.addView(Button(this).apply {
+            text = "テストの支払い通知を送る（本番と同じ流れ）"
+            setTextColor(getColor(R.color.accent))
+            setBackgroundResource(R.drawable.button_sub_bg)
+            setOnClickListener {
+                val granted = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
+                    ?.contains(packageName) == true
+                when {
+                    !granted -> text = "先に通知へのアクセスを許可してね"
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED -> {
+                        requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 2)
+                        text = "通知を許可してから、もう一度押してね"
+                    }
+                    else -> {
+                        MochiNotificationListener.postTestPayment(this@IntegrationActivity)
+                        text = "送りました！家計簿に1,280円が記録されるはず"
+                        startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    }
+                }
+            }
+        }, LinearLayout.LayoutParams(-1, px(44)).apply { topMargin = px(8) })
+
         // --- アプリごとの設定 ---
         val apps = card()
         apps.addView(title("アプリごとの設定"))

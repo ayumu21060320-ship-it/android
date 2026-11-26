@@ -25,18 +25,20 @@ class MochiNotificationListener : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        val pkg = sbn.packageName
-        if (pkg == packageName) return
         val n = sbn.notification
+        // 自分のアプリの通知は無視。ただし「テストの支払い通知」だけは本物の支払いアプリとして扱う
+        val isTest = sbn.packageName == packageName && n.extras.getBoolean(EXTRA_TEST)
+        if (sbn.packageName == packageName && !isTest) return
+        val pkg = sbn.packageName
         // 常駐通知・まとめ通知・音楽プレーヤーなどは無視
         if (sbn.isOngoing || n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
 
         val extras = n.extras
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
         val text = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT) ?: extras.getCharSequence(Notification.EXTRA_TEXT))?.toString()
-        val label = appLabel(pkg)
+        val label = if (isTest) "テスト支払い" else appLabel(pkg)
 
-        if (pkg in prefs.paymentApps) {
+        if (isTest || pkg in prefs.paymentApps) {
             val pay = PaymentParser.parse(title, text)
             if (pay != null) {
                 val money = MoneyStore(this)
@@ -113,6 +115,27 @@ class MochiNotificationListener : NotificationListenerService() {
             } else {
                 pi.send()
             }
+        }
+    }
+
+    companion object {
+        const val EXTRA_TEST = "com.mochimate.maid.TEST_PAYMENT"
+        private const val TEST_CHANNEL = "mochi_test"
+
+        /** 支払いアプリのふりをした通知を出す(サブ機で連携を確かめる用) */
+        fun postTestPayment(context: android.content.Context) {
+            val nm = context.getSystemService(android.app.NotificationManager::class.java)
+            nm.createNotificationChannel(
+                android.app.NotificationChannel(TEST_CHANNEL, "テスト用の通知", android.app.NotificationManager.IMPORTANCE_DEFAULT),
+            )
+            val n = Notification.Builder(context, TEST_CHANNEL)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle("お支払い完了（テスト）")
+                .setContentText("セブン-イレブン 青葉通店で1,280円のお支払いが完了しました")
+                .setAutoCancel(true)
+                .addExtras(android.os.Bundle().apply { putBoolean(EXTRA_TEST, true) })
+                .build()
+            nm.notify(9999, n)
         }
     }
 
