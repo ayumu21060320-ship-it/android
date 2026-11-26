@@ -22,6 +22,31 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("care_money", false)
         set(value) = sp.edit().putBoolean("care_money", value).apply()
 
+    /** 天気を調べる街。未設定なら null。 */
+    val cityName: String? get() = sp.getString("city_name", null)
+    val cityLat: Double? get() = sp.getString("city_lat", null)?.toDoubleOrNull()
+    val cityLon: Double? get() = sp.getString("city_lon", null)?.toDoubleOrNull()
+
+    fun setCity(city: City) {
+        sp.edit()
+            .putString("city_name", city.name)
+            .putString("city_lat", city.lat.toString())
+            .putString("city_lon", city.lon.toString())
+            .remove("weather_json")
+            .apply()
+    }
+
+    /** 最後に取った天気(保存した時刻, JSON) */
+    var weatherCache: Pair<Long, String>?
+        get() {
+            val json = sp.getString("weather_json", null) ?: return null
+            return sp.getLong("weather_at", 0L) to json
+        }
+        set(value) {
+            if (value == null) sp.edit().remove("weather_json").apply()
+            else sp.edit().putLong("weather_at", value.first).putString("weather_json", value.second).apply()
+        }
+
     /** ホーム画面上の位置。-1 は「まだ決まっていない」。 */
     var overlayX: Int
         get() = sp.getInt("overlay_x", -1)

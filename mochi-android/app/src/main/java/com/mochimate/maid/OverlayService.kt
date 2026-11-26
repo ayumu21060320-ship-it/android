@@ -153,8 +153,12 @@ class OverlayService : Service() {
         bubble = BubbleView(this)
         bubbleParams = baseParams(touchable = false)
 
-        // 登場のあいさつ
+        // 登場のあいさつ。天気のお世話を選んでいれば、続けて今日の天気も伝える。
         handler.postDelayed({ talk(MochiLines.greeting(prefs.masterName)) }, 400)
+        if (prefs.careWeather) {
+            talkCount = 2 // 次のタップはふつうのおしゃべりから
+            handler.postDelayed({ if (mochi != null) talkWeather() }, 4500)
+        }
     }
 
     private inner class DragTouchListener : View.OnTouchListener {
@@ -212,12 +216,19 @@ class OverlayService : Service() {
         mochi?.react()
         val name = prefs.masterName
         talkCount++
-        val line = when {
-            talkCount % 4 == 1 -> MochiLines.greeting(name)
-            Random.nextInt(4) == 0 -> MochiLines.comingSoon(prefs) ?: MochiLines.random(name)
-            else -> MochiLines.random(name)
+        when {
+            talkCount % 3 == 1 -> talk(MochiLines.greeting(name))
+            talkCount % 3 == 2 && prefs.careWeather -> talkWeather()
+            Random.nextInt(4) == 0 -> talk(MochiLines.comingSoon(prefs) ?: MochiLines.random(name))
+            else -> talk(MochiLines.random(name))
         }
-        talk(line)
+    }
+
+    private fun talkWeather() {
+        talk("お天気を調べてきますね…")
+        WeatherRepository.today(prefs) { w ->
+            if (mochi != null) talk(WeatherRepository.line(w, prefs))
+        }
     }
 
     private fun openSettings() {

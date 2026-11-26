@@ -14,6 +14,9 @@ import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.LinearLayout
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.TextView
 
 /** 設定画面: 呼び方・お世話の種類を選んで、もちもちをホーム画面に呼ぶ。 */
@@ -50,7 +53,13 @@ class MainActivity : Activity() {
             }
         })
 
-        bindCheck(R.id.careWeather, prefs.careWeather) { prefs.careWeather = it }
+        val weatherBox = findViewById<View>(R.id.weatherBox)
+        weatherBox.visibility = if (prefs.careWeather) View.VISIBLE else View.GONE
+        bindCheck(R.id.careWeather, prefs.careWeather) {
+            prefs.careWeather = it
+            weatherBox.visibility = if (it) View.VISIBLE else View.GONE
+        }
+        setupCitySearch()
         bindCheck(R.id.careCalorie, prefs.careCalorie) { prefs.careCalorie = it }
         bindCheck(R.id.careMoney, prefs.careMoney) { prefs.careMoney = it }
 
@@ -98,6 +107,68 @@ class MainActivity : Activity() {
             OverlayService.isRunning -> "おやすみさせる"
             else -> "ホーム画面に呼ぶ"
         }
+    }
+
+    // ---------- 天気の街えらび ----------
+
+    private fun setupCitySearch() {
+        val current = findViewById<TextView>(R.id.currentCity)
+        val query = findViewById<EditText>(R.id.cityQuery)
+        val results = findViewById<LinearLayout>(R.id.cityResults)
+        val search = findViewById<Button>(R.id.citySearch)
+
+        fun showCurrent() {
+            current.text = prefs.cityName?.let { "いまの街: $it" } ?: "街がまだ選ばれていません"
+        }
+        showCurrent()
+
+        fun doSearch() {
+            val q = query.text.toString().trim()
+            if (q.isEmpty()) return
+            hideKeyboard(query)
+            results.removeAllViews()
+            results.addView(resultRow("さがしています…", null))
+            WeatherRepository.searchCity(q) { cities ->
+                results.removeAllViews()
+                if (cities.isEmpty()) {
+                    results.addView(resultRow("見つかりませんでした。別の書き方でためしてね", null))
+                }
+                for (city in cities) {
+                    results.addView(
+                        resultRow("${city.name}（${city.detail}）") {
+                            prefs.setCity(city)
+                            results.removeAllViews()
+                            query.setText("")
+                            showCurrent()
+                            hello.text = "${city.name}のお天気を見ておきますね！"
+                            WeatherRepository.today(prefs, force = true) { w ->
+                                hello.text = WeatherRepository.line(w, prefs)
+                            }
+                        },
+                    )
+                }
+            }
+        }
+
+        search.setOnClickListener { doSearch() }
+        query.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) { doSearch(); true } else false
+        }
+    }
+
+    private fun resultRow(text: String, onClick: (() -> Unit)?): TextView {
+        val pad = (10 * resources.displayMetrics.density).toInt()
+        return TextView(this).apply {
+            this.text = if (onClick != null) "📍 $text" else text
+            textSize = 15f
+            setTextColor(getColor(if (onClick != null) R.color.ink else R.color.ink_sub))
+            setPadding(pad / 2, pad, pad / 2, pad)
+            if (onClick != null) setOnClickListener { onClick() }
+        }
+    }
+
+    private fun hideKeyboard(v: View) {
+        getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(v.windowToken, 0)
     }
 
     private fun bindCheck(id: Int, initial: Boolean, onChange: (Boolean) -> Unit) {

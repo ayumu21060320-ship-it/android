@@ -78,7 +78,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="いまはおしゃべりだけ。順番に使えるようになります"
+                android:text="カロリーと家計簿は順番に使えるようになります"
                 android:textColor="@color/ink_sub"
                 android:textSize="13sp" />
 
@@ -87,9 +87,62 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="☀️ 天気を教えてほしい（準備中）"
+                android:text="☀️ 天気を教えてほしい"
                 android:textColor="@color/ink"
                 android:textSize="16sp" />
+
+            <LinearLayout
+                android:id="@+id/weatherBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="32dp"
+                android:layout_marginBottom="8dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/currentCity"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/ink_sub"
+                    android:textSize="14sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/cityQuery"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="街の名前（例: 横浜）"
+                        android:imeOptions="actionSearch"
+                        android:importantForAutofill="no"
+                        android:inputType="text"
+                        android:textColor="@color/ink"
+                        android:textSize="15sp" />
+
+                    <Button
+                        android:id="@+id/citySearch"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:layout_marginStart="8dp"
+                        android:background="@drawable/button_sub_bg"
+                        android:paddingStart="16dp"
+                        android:paddingEnd="16dp"
+                        android:text="さがす"
+                        android:textColor="@color/accent"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/cityResults"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </LinearLayout>
 
             <CheckBox
                 android:id="@+id/careCalorie"

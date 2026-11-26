@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- 天気を調べるための通信 -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- ホーム画面の上にもちもちを表示するための権限 -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- アプリを閉じても、もちもちが消されないようにするための権限 -->
