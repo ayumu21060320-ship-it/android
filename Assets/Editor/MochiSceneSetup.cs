@@ -62,8 +62,10 @@ public static class MochiSceneSetup
         Text speechText = EnsureSpeechCanvas();
         WeatherService weatherService = EnsureWeatherComponents(mochi, speechText);
         GameObject[] locationObjects = EnsureLocationUI(weatherService);
-        (GameObject healthPanel, Button okButton) = EnsureHealthPanel();
-        EnsureAppController(mochi, speechText, locationObjects, healthPanel, okButton);
+        GameObject healthPanel = EnsureHealthPanel();
+        (GameObject categoryPanel, Toggle weatherToggle, Toggle healthToggle, Button nextButton) = EnsureCategoryPanel();
+        GameObject okBar = EnsureOkBar(out Button okButton);
+        EnsureAppController(mochi, speechText, locationObjects, healthPanel, categoryPanel, weatherToggle, healthToggle, nextButton, okBar, okButton, weatherService);
 
         Selection.activeGameObject = mochi;
         EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
@@ -452,10 +454,12 @@ public static class MochiSceneSetup
 
         var placeholderText = inputField.placeholder.GetComponent<Text>();
         placeholderText.font = GetUiFont();
+        placeholderText.fontSize = 32;
         placeholderText.text = "街の名前を入力(例: Tokyo)";
 
         var inputText = inputField.textComponent;
         inputText.font = GetUiFont();
+        inputText.fontSize = 32;
 
         // 検索ボタン
         GameObject buttonGo = CreateButtonRaw(panel, "SearchButton");
@@ -464,6 +468,7 @@ public static class MochiSceneSetup
 
         var buttonText = buttonGo.GetComponentInChildren<Text>();
         buttonText.font = GetUiFont();
+        buttonText.fontSize = 32;
         buttonText.text = "検索";
         buttonText.color = Color.white;
 
@@ -472,7 +477,7 @@ public static class MochiSceneSetup
         EnsureRect(statusGo, new Vector2(0.1f, -0.02f), new Vector2(0.9f, 0.03f));
         var statusText = statusGo.GetComponent<Text>();
         statusText.font = GetUiFont();
-        statusText.fontSize = 28;
+        statusText.fontSize = 30;
         statusText.alignment = TextAnchor.MiddleCenter;
         statusText.color = Color.black;
 
@@ -512,7 +517,7 @@ public static class MochiSceneSetup
         return rect;
     }
 
-    private static (GameObject panel, Button okButton) EnsureHealthPanel()
+    private static GameObject EnsureHealthPanel()
     {
         GameObject canvasGo = GameObject.Find("HealthCanvas");
         if (canvasGo == null)
@@ -540,31 +545,28 @@ public static class MochiSceneSetup
         layout.childForceExpandHeight = false;
         layout.childForceExpandWidth = true;
 
-        Text title = CreateLayoutText(panel, "TitleText", 70f, "健康管理", 36);
+        Text title = CreateLayoutText(panel, "TitleText", 80f, "健康管理", 44);
 
-        InputField weightField = CreateLayoutInputField(panel, "WeightInputField", 60f, "体重(kg)");
-        InputField heightField = CreateLayoutInputField(panel, "HeightInputField", 60f, "身長(cm)");
-        InputField ageField = CreateLayoutInputField(panel, "AgeInputField", 60f, "年齢");
+        InputField weightField = CreateLayoutInputField(panel, "WeightInputField", 80f, "体重(kg)");
+        InputField heightField = CreateLayoutInputField(panel, "HeightInputField", 80f, "身長(cm)");
+        InputField ageField = CreateLayoutInputField(panel, "AgeInputField", 80f, "年齢");
 
-        Toggle isMaleToggle = CreateLayoutToggle(panel, "IsMaleToggle", 50f, "男性");
+        Toggle isMaleToggle = CreateLayoutToggle(panel, "IsMaleToggle", 70f, "男性");
 
-        Slider activitySlider = CreateLayoutSlider(panel, "ActivitySlider", 60f);
+        Slider activitySlider = CreateLayoutSlider(panel, "ActivitySlider", 70f);
         activitySlider.minValue = 0;
         activitySlider.maxValue = 2;
         activitySlider.wholeNumbers = true;
 
-        Button saveButton = CreateLayoutButton(panel, "SaveProfileButton", 60f, "保存して計算");
-        Text calorieGoalText = CreateLayoutText(panel, "CalorieGoalText", 50f, "1日の目安: -- kcal", 28);
+        Button saveButton = CreateLayoutButton(panel, "SaveProfileButton", 80f, "保存して計算");
+        Text calorieGoalText = CreateLayoutText(panel, "CalorieGoalText", 60f, "1日の目安: -- kcal", 32);
 
-        InputField foodNameField = CreateLayoutInputField(panel, "FoodNameInputField", 60f, "食べたもの");
-        InputField foodCaloriesField = CreateLayoutInputField(panel, "FoodCaloriesInputField", 60f, "カロリー(kcal)");
-        Button addFoodButton = CreateLayoutButton(panel, "AddFoodButton", 60f, "追加");
+        InputField foodNameField = CreateLayoutInputField(panel, "FoodNameInputField", 80f, "食べたもの");
+        InputField foodCaloriesField = CreateLayoutInputField(panel, "FoodCaloriesInputField", 80f, "カロリー(kcal)");
+        Button addFoodButton = CreateLayoutButton(panel, "AddFoodButton", 80f, "追加");
 
-        Text foodLogText = CreateLayoutText(panel, "FoodLogText", 300f, "今日の合計: 0kcal", 24);
+        Text foodLogText = CreateLayoutText(panel, "FoodLogText", 300f, "今日の合計: 0kcal", 28);
         foodLogText.alignment = TextAnchor.UpperLeft;
-
-        Button okButton = CreateLayoutButton(panel, "OkButton", 80f, "はじめる");
-        okButton.GetComponent<Image>().color = new Color(0.95f, 0.6f, 0.2f);
 
         var userProfile = canvasGo.GetComponent<UserProfile>();
         if (userProfile == null) userProfile = canvasGo.AddComponent<UserProfile>();
@@ -591,7 +593,7 @@ public static class MochiSceneSetup
         so.FindProperty("foodLogText").objectReferenceValue = foodLogText;
         so.ApplyModifiedPropertiesWithoutUndo();
 
-        return (panel, okButton);
+        return panel;
     }
 
     // --- Unity標準のUI作成メニューと同じ部品(DefaultControls)をそのまま使う生成ヘルパー ---
@@ -677,10 +679,12 @@ public static class MochiSceneSetup
 
         var placeholderText = inputField.placeholder.GetComponent<Text>();
         placeholderText.font = GetUiFont();
+        placeholderText.fontSize = 32;
         placeholderText.text = placeholder;
 
         var text = inputField.textComponent;
         text.font = GetUiFont();
+        text.fontSize = 32;
 
         return inputField;
     }
@@ -694,6 +698,7 @@ public static class MochiSceneSetup
 
         var text = go.GetComponentInChildren<Text>();
         text.font = GetUiFont();
+        text.fontSize = 34;
         text.text = label;
         text.color = Color.white;
 
@@ -707,6 +712,7 @@ public static class MochiSceneSetup
 
         var labelText = go.GetComponentInChildren<Text>();
         labelText.font = GetUiFont();
+        labelText.fontSize = 32;
         labelText.text = label;
         labelText.color = Color.black;
 
@@ -719,32 +725,126 @@ public static class MochiSceneSetup
         return AddLayoutElement<Slider>(go, height);
     }
 
-    private static void EnsureAppController(GameObject mochi, Text speechText, GameObject[] locationObjects, GameObject healthPanel, Button okButton)
+    private static void EnsureAppController(
+        GameObject mochi,
+        Text speechText,
+        GameObject[] locationObjects,
+        GameObject healthPanel,
+        GameObject categoryPanel,
+        Toggle weatherToggle,
+        Toggle healthToggle,
+        Button categoryNextButton,
+        GameObject okBar,
+        Button okButton,
+        WeatherService weatherService)
     {
         var controller = mochi.GetComponent<MochiAppController>();
         if (controller == null) controller = mochi.AddComponent<MochiAppController>();
 
-        var settingsPanels = new System.Collections.Generic.List<GameObject>(locationObjects);
-        if (healthPanel != null) settingsPanels.Add(healthPanel);
-
         var so = new SerializedObject(controller);
+
+        so.FindProperty("categoryPanel").objectReferenceValue = categoryPanel;
+        so.FindProperty("wantWeatherToggle").objectReferenceValue = weatherToggle;
+        so.FindProperty("wantHealthToggle").objectReferenceValue = healthToggle;
+        so.FindProperty("categoryNextButton").objectReferenceValue = categoryNextButton;
+
+        var weatherSettingsProp = so.FindProperty("weatherSettingsObjects");
+        weatherSettingsProp.arraySize = locationObjects.Length;
+        for (int i = 0; i < locationObjects.Length; i++)
+        {
+            weatherSettingsProp.GetArrayElementAtIndex(i).objectReferenceValue = locationObjects[i];
+        }
+
+        var healthSettingsProp = so.FindProperty("healthSettingsObjects");
+        healthSettingsProp.arraySize = healthPanel != null ? 1 : 0;
+        if (healthPanel != null)
+        {
+            healthSettingsProp.GetArrayElementAtIndex(0).objectReferenceValue = healthPanel;
+        }
+
+        so.FindProperty("weatherService").objectReferenceValue = weatherService;
+
+        so.FindProperty("okBarRoot").objectReferenceValue = okBar;
+        so.FindProperty("okButton").objectReferenceValue = okButton;
+
         so.FindProperty("mochiRoot").objectReferenceValue = mochi;
         so.FindProperty("mochiBody").objectReferenceValue = mochi.GetComponent<MochiBody>();
-        so.FindProperty("okButton").objectReferenceValue = okButton;
         so.FindProperty("speechText").objectReferenceValue = speechText;
 
         var activeOnlyProp = so.FindProperty("activeOnlyObjects");
         activeOnlyProp.arraySize = 1;
         activeOnlyProp.GetArrayElementAtIndex(0).objectReferenceValue = speechText != null ? speechText.gameObject : null;
 
-        var settingsProp = so.FindProperty("settingsPanels");
-        settingsProp.arraySize = settingsPanels.Count;
-        for (int i = 0; i < settingsPanels.Count; i++)
-        {
-            settingsProp.GetArrayElementAtIndex(i).objectReferenceValue = settingsPanels[i];
-        }
-
         so.ApplyModifiedPropertiesWithoutUndo();
     }
 
+    private static (GameObject panel, Toggle weatherToggle, Toggle healthToggle, Button nextButton) EnsureCategoryPanel()
+    {
+        GameObject canvasGo = GameObject.Find("CategoryCanvas");
+        if (canvasGo == null)
+        {
+            canvasGo = new GameObject("CategoryCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            Undo.RegisterCreatedObjectUndo(canvasGo, "Create CategoryCanvas");
+
+            var canvas = canvasGo.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+
+            var scaler = canvasGo.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1080f, 1920f);
+        }
+
+        GameObject panel = EnsureChild(canvasGo, "CategoryPanel", typeof(Image), typeof(VerticalLayoutGroup));
+        EnsureRect(panel, Vector2.zero, Vector2.one);
+        panel.GetComponent<Image>().color = new Color(0.95f, 0.95f, 0.95f, 1f);
+
+        var layout = panel.GetComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(60, 60, 160, 60);
+        layout.spacing = 40f;
+        layout.childControlHeight = true;
+        layout.childControlWidth = true;
+        layout.childForceExpandHeight = false;
+        layout.childForceExpandWidth = true;
+        layout.childAlignment = TextAnchor.UpperCenter;
+
+        CreateLayoutText(panel, "TitleText", 100f, "なにをお世話してほしい?", 44);
+        Toggle weatherToggle = CreateLayoutToggle(panel, "WantWeatherToggle", 80f, "天気を教えてほしい");
+        Toggle healthToggle = CreateLayoutToggle(panel, "WantHealthToggle", 80f, "健康管理をしてほしい");
+        Button nextButton = CreateLayoutButton(panel, "NextButton", 100f, "つぎへ");
+
+        return (panel, weatherToggle, healthToggle, nextButton);
+    }
+
+    private static GameObject EnsureOkBar(out Button okButton)
+    {
+        GameObject canvasGo = GameObject.Find("HealthCanvas");
+        if (canvasGo == null)
+        {
+            canvasGo = new GameObject("HealthCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            Undo.RegisterCreatedObjectUndo(canvasGo, "Create HealthCanvas");
+
+            var canvas = canvasGo.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+
+            var scaler = canvasGo.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1080f, 1920f);
+        }
+
+        GameObject bar = EnsureChild(canvasGo, "OkBar", typeof(RectTransform));
+        EnsureRect(bar, new Vector2(0.1f, 0.02f), new Vector2(0.9f, 0.1f));
+
+        GameObject buttonGo = CreateButtonRaw(bar, "OkButton");
+        EnsureRect(buttonGo, Vector2.zero, Vector2.one);
+        buttonGo.GetComponent<Image>().color = new Color(0.95f, 0.6f, 0.2f);
+
+        var text = buttonGo.GetComponentInChildren<Text>();
+        text.font = GetUiFont();
+        text.fontSize = 38;
+        text.text = "はじめる";
+        text.color = Color.white;
+
+        okButton = buttonGo.GetComponent<Button>();
+        return bar;
+    }
 }

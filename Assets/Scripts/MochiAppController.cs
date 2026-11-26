@@ -2,12 +2,33 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // アプリ全体の流れを管理します。
-// 1. 起動直後はキャラは出さず、設定パネル(天気の場所・健康プロフィール)だけ表示
-// 2. 「OK」ボタンを押すとキャラが登場し、以後は設定パネルは隠れる
-// 3. キャラをダブルタップすると、設定パネルを開閉できる
+// 1. 起動直後は「何をお世話してほしいか」を選ぶ画面だけ表示(天気・健康管理など)
+// 2. 選んだ項目の入力欄だけが表示される
+// 3. 下部の「はじめる」ボタンを押すとキャラが登場し、以後はこれらの画面は隠れる
+// 4. キャラをダブルタップすると、選んだ項目の入力欄をまた開ける
 public class MochiAppController : MonoBehaviour
 {
-    [Header("参照")]
+    [Header("お世話カテゴリーを選ぶ画面(最初に出る)")]
+    [SerializeField] private GameObject categoryPanel;
+    [SerializeField] private Toggle wantWeatherToggle;
+    [SerializeField] private Toggle wantHealthToggle;
+    [SerializeField] private Button categoryNextButton;
+
+    [Header("選んだ項目ごとの入力画面")]
+    [Tooltip("天気を選んだ時だけ表示するもの(場所の検索欄など)")]
+    [SerializeField] private GameObject[] weatherSettingsObjects = new GameObject[0];
+
+    [Tooltip("健康管理を選んだ時だけ表示するもの(体重・食事ログなど)")]
+    [SerializeField] private GameObject[] healthSettingsObjects = new GameObject[0];
+
+    [Tooltip("天気の取得処理そのもの(選ばなかった場合は止めておく)")]
+    [SerializeField] private WeatherService weatherService;
+
+    [Header("入力が終わったら押す「はじめる」バー")]
+    [SerializeField] private GameObject okBarRoot;
+    [SerializeField] private Button okButton;
+
+    [Header("キャラが登場してから表示するもの")]
     [Tooltip("お世話されるキャラ本体(Mochi)。起動直後は隠しておきます。")]
     [SerializeField] private GameObject mochiRoot;
 
@@ -17,23 +38,20 @@ public class MochiAppController : MonoBehaviour
     [Tooltip("キャラが登場してから常に表示するもの(セリフの吹き出しなど)")]
     [SerializeField] private GameObject[] activeOnlyObjects = new GameObject[0];
 
-    [Tooltip("最初の設定・あとからの編集で表示するパネル(天気の場所・健康プロフィールなど)")]
-    [SerializeField] private GameObject[] settingsPanels = new GameObject[0];
-
-    [Tooltip("設定パネルの「OK」ボタン")]
-    [SerializeField] private Button okButton;
-
     [Tooltip("キャラ登場時に最初にしゃべらせるセリフの表示先")]
     [SerializeField] private Text speechText;
 
     private const string OnboardedKey = "Mochi_HasOnboarded";
+    private const string WantWeatherKey = "Mochi_WantWeather";
+    private const string WantHealthKey = "Mochi_WantHealth";
+
+    private bool wantWeather = true;
+    private bool wantHealth = true;
 
     private void Awake()
     {
-        if (okButton != null)
-        {
-            okButton.onClick.AddListener(OnOkClicked);
-        }
+        if (categoryNextButton != null) categoryNextButton.onClick.AddListener(OnCategoryNextClicked);
+        if (okButton != null) okButton.onClick.AddListener(OnOkClicked);
 
         if (mochiBody != null)
         {
@@ -52,10 +70,45 @@ public class MochiAppController : MonoBehaviour
     private void Start()
     {
         bool hasOnboarded = PlayerPrefs.GetInt(OnboardedKey, 0) == 1;
+        wantWeather = PlayerPrefs.GetInt(WantWeatherKey, 1) == 1;
+        wantHealth = PlayerPrefs.GetInt(WantHealthKey, 1) == 1;
 
-        SetActive(mochiRoot, hasOnboarded);
-        SetActiveAll(activeOnlyObjects, hasOnboarded);
-        SetActiveAll(settingsPanels, !hasOnboarded);
+        if (hasOnboarded)
+        {
+            ApplyCategoryVisibility(false);
+            SetActive(categoryPanel, false);
+            SetActive(okBarRoot, false);
+            SetActive(mochiRoot, true);
+            SetActiveAll(activeOnlyObjects, true);
+            if (weatherService != null) weatherService.enabled = wantWeather;
+        }
+        else
+        {
+            SetActive(categoryPanel, true);
+            ApplyCategoryVisibility(false);
+            SetActive(okBarRoot, false);
+            SetActive(mochiRoot, false);
+            SetActiveAll(activeOnlyObjects, false);
+
+            if (wantWeatherToggle != null) wantWeatherToggle.isOn = wantWeather;
+            if (wantHealthToggle != null) wantHealthToggle.isOn = wantHealth;
+        }
+    }
+
+    private void OnCategoryNextClicked()
+    {
+        wantWeather = wantWeatherToggle == null || wantWeatherToggle.isOn;
+        wantHealth = wantHealthToggle == null || wantHealthToggle.isOn;
+
+        PlayerPrefs.SetInt(WantWeatherKey, wantWeather ? 1 : 0);
+        PlayerPrefs.SetInt(WantHealthKey, wantHealth ? 1 : 0);
+        PlayerPrefs.Save();
+
+        if (weatherService != null) weatherService.enabled = wantWeather;
+
+        SetActive(categoryPanel, false);
+        ApplyCategoryVisibility(true);
+        SetActive(okBarRoot, true);
     }
 
     private void OnOkClicked()
@@ -63,9 +116,11 @@ public class MochiAppController : MonoBehaviour
         PlayerPrefs.SetInt(OnboardedKey, 1);
         PlayerPrefs.Save();
 
+        ApplyCategoryVisibility(false);
+        SetActive(okBarRoot, false);
+
         SetActive(mochiRoot, true);
         SetActiveAll(activeOnlyObjects, true);
-        SetActiveAll(settingsPanels, false);
 
         if (speechText != null)
         {
@@ -75,8 +130,16 @@ public class MochiAppController : MonoBehaviour
 
     private void OnMochiDoubleTapped()
     {
-        bool currentlyVisible = settingsPanels.Length > 0 && settingsPanels[0] != null && settingsPanels[0].activeSelf;
-        SetActiveAll(settingsPanels, !currentlyVisible);
+        bool currentlyVisible = okBarRoot != null && okBarRoot.activeSelf;
+
+        ApplyCategoryVisibility(!currentlyVisible);
+        SetActive(okBarRoot, !currentlyVisible);
+    }
+
+    private void ApplyCategoryVisibility(bool visible)
+    {
+        SetActiveAll(weatherSettingsObjects, visible && wantWeather);
+        SetActiveAll(healthSettingsObjects, visible && wantHealth);
     }
 
     private static void SetActive(GameObject go, bool active)
