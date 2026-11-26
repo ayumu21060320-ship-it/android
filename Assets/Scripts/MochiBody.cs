@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -5,8 +6,12 @@ using UnityEngine.EventSystems;
 // つつくと潰れて(Squash)、離すとバネでぷるんと戻ります(Spring)。
 // タップ判定には Collider(SphereColliderなど) と、
 // カメラに付けた Physics Raycaster + シーン内の EventSystem が必要です。
-public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
+public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
 {
+    // ダブルタップされた時に呼ばれます(設定パネルの開閉などに使えます)。
+    public event Action OnDoubleTapped;
+
+
     [Header("参照")]
     [Tooltip("顔パーツを管理しているMochiFace。未設定なら自動で子から探します。")]
     [SerializeField] private MochiFace face;
@@ -129,6 +134,14 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
     public void OnPointerExit(PointerEventData eventData)
     {
         if (isPoked) ReleasePoke();
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        if (eventData.clickCount >= 2)
+        {
+            OnDoubleTapped?.Invoke();
+        }
     }
 
     private void ReleasePoke()
