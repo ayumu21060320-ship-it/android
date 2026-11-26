@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- tools/maid_art.py で自動生成。直接書き換えず、スクリプトを直してください。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:width="200dp" android:height="240dp" android:viewportWidth="200" android:viewportHeight="240">
+<path android:pathData="M62,118 a13,16.5 0 1,0 26,0 a13,16.5 0 1,0 -26,0 Z" android:fillColor="#FFFFFF"/>
+<path android:pathData="M63,119 a12,15.5 0 1,0 24,0 a12,15.5 0 1,0 -24,0 Z"><aapt:attr name="android:fillColor"><gradient android:type="linear" android:startX="75" android:startY="103" android:endX="75" android:endY="134"><item android:offset="0" android:color="#FF3E2675"/><item android:offset="0.55" android:color="#FF7B52D1"/><item android:offset="1" android:color="#FFC8A6FF"/></gradient></aapt:attr></path>
+<path android:pathData="M69,121 a6,7.5 0 1,0 12,0 a6,7.5 0 1,0 -12,0 Z" android:fillColor="#3E2675" android:fillAlpha="0.55"/>
+<path android:pathData="M66,112 a5,6 0 1,0 10,0 a5,6 0 1,0 -10,0 Z" android:fillColor="#FFFFFF"/>
+<path android:pathData="M77.4,126 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z" android:fillColor="#FFFFFF" android:fillAlpha="0.9"/>
+<path android:pathData="M79.6,115 a1.4,1.4 0 1,0 2.8,0 a1.4,1.4 0 1,0 -2.8,0 Z" android:fillColor="#FFFFFF" android:fillAlpha="0.8"/>
+<path android:pathData="M88,113 Q76,95 62,111 L58,108" android:strokeColor="#5B3B36" android:strokeWidth="3.6" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+<path android:pathData="M112,118 a13,16.5 0 1,0 26,0 a13,16.5 0 1,0 -26,0 Z" android:fillColor="#FFFFFF"/>
+<path android:pathData="M113,119 a12,15.5 0 1,0 24,0 a12,15.5 0 1,0 -24,0 Z"><aapt:attr name="android:fillColor"><gradient android:type="linear" android:startX="125" android:startY="103" android:endX="125" android:endY="134"><item android:offset="0" android:color="#FF3E2675"/><item android:offset="0.55" android:color="#FF7B52D1"/><item android:offset="1" android:color="#FFC8A6FF"/></gradient></aapt:attr></path>
+<path android:pathData="M119,121 a6,7.5 0 1,0 12,0 a6,7.5 0 1,0 -12,0 Z" android:fillColor="#3E2675" android:fillAlpha="0.55"/>
+<path android:pathData="M116,112 a5,6 0 1,0 10,0 a5,6 0 1,0 -10,0 Z" android:fillColor="#FFFFFF"/>
+<path android:pathData="M127.4,126 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z" android:fillColor="#FFFFFF" android:fillAlpha="0.9"/>
+<path android:pathData="M129.6,115 a1.4,1.4 0 1,0 2.8,0 a1.4,1.4 0 1,0 -2.8,0 Z" android:fillColor="#FFFFFF" android:fillAlpha="0.8"/>
+<path android:pathData="M112,113 Q124,95 138,111 L142,108" android:strokeColor="#5B3B36" android:strokeWidth="3.6" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+</vector>

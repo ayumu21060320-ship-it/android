@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- tools/maid_art.py で自動生成。直接書き換えず、スクリプトを直してください。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:width="200dp" android:height="240dp" android:viewportWidth="200" android:viewportHeight="240">
+<path android:pathData="M63,119 Q75,127 87,119 l-3,-3" android:strokeColor="#5B3B36" android:strokeWidth="3.6" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+<path android:pathData="M113,119 Q125,127 137,119 l3,-3" android:strokeColor="#5B3B36" android:strokeWidth="3.6" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+</vector>

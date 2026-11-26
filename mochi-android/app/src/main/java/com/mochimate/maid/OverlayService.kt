@@ -150,13 +150,15 @@ class OverlayService : Service() {
     private fun showMochi() {
         val view = MochiView(this)
         val (sw, sh) = screenSize()
-        val size = (96 * resources.displayMetrics.density).toInt()
+        view.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        val size = view.measuredWidth
+        val sizeH = view.measuredHeight
 
         mochiParams = baseParams(touchable = true).apply {
-            x = if (prefs.overlayX >= 0) prefs.overlayX else sw - size - (16 * resources.displayMetrics.density).toInt()
-            y = if (prefs.overlayY >= 0) prefs.overlayY else (sh * 0.55f).toInt()
-            x = x.coerceIn(0, (sw - size).coerceAtLeast(0))
-            y = y.coerceIn(0, (sh - size).coerceAtLeast(0))
+            x = if (prefs.overlayX != Prefs.UNSET) prefs.overlayX else sw - size - (16 * resources.displayMetrics.density).toInt()
+            y = if (prefs.overlayY != Prefs.UNSET) prefs.overlayY else (sh * 0.55f).toInt()
+            x = x.coerceIn(-(size * MochiView.CONTENT_LEFT).toInt(), sw - (size * MochiView.CONTENT_RIGHT).toInt())
+            y = y.coerceIn(-(sizeH * MochiView.CONTENT_TOP).toInt(), sh - (sizeH * MochiView.CONTENT_BOTTOM).toInt())
         }
         view.setOnTouchListener(DragTouchListener())
         wm.addView(view, mochiParams)
@@ -265,17 +267,16 @@ class OverlayService : Service() {
     private fun bounds(): Bounds {
         val (sw, sh) = screenSize()
         val m = mochi
-        val w = m?.width?.takeIf { it > 0 } ?: (96 * resources.displayMetrics.density).toInt()
-        val h = m?.height?.takeIf { it > 0 } ?: w
+        val w = m?.width?.takeIf { it > 0 } ?: m?.measuredWidth ?: 0
+        val h = m?.height?.takeIf { it > 0 } ?: m?.measuredHeight ?: 0
         return Bounds(
-            minX = -(w * 0.1f).toInt(),
-            maxX = sw - (w * 0.9f).toInt(),
-            minY = -(h * 0.18f).toInt(),
-            maxY = sh - (h * 0.97f).toInt(),
+            minX = -(w * MochiView.CONTENT_LEFT).toInt(),
+            maxX = sw - (w * MochiView.CONTENT_RIGHT).toInt(),
+            minY = -(h * MochiView.CONTENT_TOP).toInt(),
+            maxY = sh - (h * MochiView.CONTENT_BOTTOM).toInt(),
         )
     }
 
-    // 動きの状態。ぶん投げも、勝手にふわふわ漂うのも、同じ「動きのループ」で計算する。
     private var vx = 0f
     private var vy = 0f
     private var px = 0f
@@ -476,7 +477,7 @@ class OverlayService : Service() {
         val bw = b.measuredWidth
         val bh = b.measuredHeight
 
-        var y = mochiParams.y - bh + (mochiH * 0.18f).toInt()
+        var y = mochiParams.y - bh + (mochiH * (MochiView.CONTENT_TOP - 0.02f)).toInt()
         if (y < 0) {
             b.tailOnTop = true
             y = mochiParams.y + mochiH - (mochiH * 0.05f).toInt()

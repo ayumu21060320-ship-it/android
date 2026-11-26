@@ -52,16 +52,17 @@ class Prefs(context: Context) {
             else sp.edit().putLong("weather_at", value.first).putString("weather_json", value.second).apply()
         }
 
-    /** ホーム画面上の位置。-1 は「まだ決まっていない」。 */
+    /** ホーム画面上の位置。UNSET は「まだ決まっていない」(画面の端では負の値にもなる)。 */
     var overlayX: Int
-        get() = sp.getInt("overlay_x", -1)
+        get() = sp.getInt("overlay_x", UNSET)
         set(value) = sp.edit().putInt("overlay_x", value).apply()
 
     var overlayY: Int
-        get() = sp.getInt("overlay_y", -1)
+        get() = sp.getInt("overlay_y", UNSET)
         set(value) = sp.edit().putInt("overlay_y", value).apply()
 
     companion object {
         const val DEFAULT_NAME = "ご主人様"
+        const val UNSET = Int.MIN_VALUE
     }
 }

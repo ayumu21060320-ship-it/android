@@ -15,7 +15,7 @@
         <com.mochimate.maid.MochiView
             android:id="@+id/preview"
             android:layout_width="120dp"
-            android:layout_height="120dp"
+            android:layout_height="153dp"
             android:layout_gravity="center_horizontal"
             android:layout_marginTop="8dp" />
 
