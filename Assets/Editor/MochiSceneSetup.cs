@@ -8,6 +8,21 @@ using UnityEngine.UI;
 // Mochiキャラのシーン構成(カメラ設定・本体・顔・スクリプトのアタッチ)を自動で行うツールです。
 public static class MochiSceneSetup
 {
+    private static Font cachedUiFont;
+
+    // 日本語(ひらがな・漢字)も表示できるよう、OSにインストールされているフォントから動的に作成します。
+    // Unity同梱のArial.ttf/LegacyRuntime.ttfは欧文フォントで日本語グリフを持たないため使いません。
+    private static Font GetUiFont()
+    {
+        if (cachedUiFont != null) return cachedUiFont;
+
+        cachedUiFont = Font.CreateDynamicFontFromOSFont(
+            new[] { "Yu Gothic UI", "Meiryo UI", "Meiryo", "MS Gothic", "Arial" },
+            32);
+
+        return cachedUiFont;
+    }
+
     [MenuItem("Mochi/Setup Scene")]
     public static void SetupScene()
     {
@@ -287,7 +302,7 @@ public static class MochiSceneSetup
         rect.offsetMax = Vector2.zero;
 
         var text = textGo.GetComponent<Text>();
-        text.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
+        text.font = GetUiFont();
         text.fontSize = 48;
         text.alignment = TextAnchor.MiddleCenter;
         text.color = Color.black;
@@ -363,7 +378,7 @@ public static class MochiSceneSetup
         GameObject placeholderGo = EnsureChild(inputGo, "Placeholder", typeof(Text));
         EnsureRect(placeholderGo, Vector2.zero, Vector2.one);
         var placeholderText = placeholderGo.GetComponent<Text>();
-        placeholderText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
+        placeholderText.font = GetUiFont();
         placeholderText.text = "街の名前を入力(例: Tokyo)";
         placeholderText.color = new Color(0f, 0f, 0f, 0.5f);
         placeholderText.alignment = TextAnchor.MiddleLeft;
@@ -371,7 +386,7 @@ public static class MochiSceneSetup
         GameObject inputTextGo = EnsureChild(inputGo, "Text", typeof(Text));
         EnsureRect(inputTextGo, Vector2.zero, Vector2.one);
         var inputText = inputTextGo.GetComponent<Text>();
-        inputText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
+        inputText.font = GetUiFont();
         inputText.color = Color.black;
         inputText.alignment = TextAnchor.MiddleLeft;
 
@@ -387,7 +402,7 @@ public static class MochiSceneSetup
         GameObject buttonTextGo = EnsureChild(buttonGo, "Text", typeof(Text));
         EnsureRect(buttonTextGo, Vector2.zero, Vector2.one);
         var buttonText = buttonTextGo.GetComponent<Text>();
-        buttonText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
+        buttonText.font = GetUiFont();
         buttonText.text = "検索";
         buttonText.color = Color.white;
         buttonText.alignment = TextAnchor.MiddleCenter;
@@ -396,7 +411,7 @@ public static class MochiSceneSetup
         GameObject statusGo = EnsureChild(canvasGo, "LocationStatusText", typeof(Text));
         EnsureRect(statusGo, new Vector2(0.1f, -0.02f), new Vector2(0.9f, 0.03f));
         var statusText = statusGo.GetComponent<Text>();
-        statusText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
+        statusText.font = GetUiFont();
         statusText.fontSize = 28;
         statusText.alignment = TextAnchor.MiddleCenter;
         statusText.color = Color.black;
@@ -537,7 +552,7 @@ public static class MochiSceneSetup
     {
         GameObject go = CreateLayoutChild(parent, name, height, typeof(Text));
         var text = go.GetComponent<Text>();
-        text.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
+        text.font = GetUiFont();
         text.fontSize = fontSize;
         text.alignment = TextAnchor.MiddleCenter;
         text.color = Color.black;
@@ -553,7 +568,7 @@ public static class MochiSceneSetup
         GameObject placeholderGo = EnsureChild(go, "Placeholder", typeof(Text));
         EnsureRect(placeholderGo, Vector2.zero, Vector2.one);
         var placeholderText = placeholderGo.GetComponent<Text>();
-        placeholderText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
+        placeholderText.font = GetUiFont();
         placeholderText.text = placeholder;
         placeholderText.color = new Color(0f, 0f, 0f, 0.5f);
         placeholderText.alignment = TextAnchor.MiddleLeft;
@@ -561,7 +576,7 @@ public static class MochiSceneSetup
         GameObject textGo = EnsureChild(go, "Text", typeof(Text));
         EnsureRect(textGo, Vector2.zero, Vector2.one);
         var text = textGo.GetComponent<Text>();
-        text.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
+        text.font = GetUiFont();
         text.color = Color.black;
         text.alignment = TextAnchor.MiddleLeft;
 
@@ -579,7 +594,7 @@ public static class MochiSceneSetup
         GameObject textGo = EnsureChild(go, "Text", typeof(Text));
         EnsureRect(textGo, Vector2.zero, Vector2.one);
         var text = textGo.GetComponent<Text>();
-        text.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
+        text.font = GetUiFont();
         text.text = label;
         text.color = Color.white;
         text.alignment = TextAnchor.MiddleCenter;
@@ -607,7 +622,7 @@ public static class MochiSceneSetup
         labelRect.offsetMin = new Vector2(50f, 0f);
         labelRect.offsetMax = Vector2.zero;
         var labelText = labelGo.GetComponent<Text>();
-        labelText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("LegacyRuntime.ttf");
+        labelText.font = GetUiFont();
         labelText.text = label;
         labelText.color = Color.black;
         labelText.alignment = TextAnchor.MiddleLeft;
