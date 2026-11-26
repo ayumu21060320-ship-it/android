@@ -5,7 +5,7 @@ using UnityEngine.EventSystems;
 // つつくと潰れて(Squash)、離すとバネでぷるんと戻ります(Spring)。
 // タップ判定には Collider(SphereColliderなど) と、
 // カメラに付けた Physics Raycaster + シーン内の EventSystem が必要です。
-public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler
+public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
     [Header("参照")]
     [Tooltip("顔パーツを管理しているMochiFace。未設定なら自動で子から探します。")]
@@ -13,6 +13,19 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
 
     [Tooltip("手足を管理しているMochiLimbs。未設定なら自動で同じGameObjectから探します。")]
     [SerializeField] private MochiLimbs limbs;
+
+    [Header("無重力でふわふわ漂う設定")]
+    [Tooltip("上下に漂う高さ")]
+    [SerializeField] private float floatAmplitudeY = 0.15f;
+
+    [Tooltip("左右に漂う幅")]
+    [SerializeField] private float floatAmplitudeX = 0.08f;
+
+    [Tooltip("ゆらゆら傾く角度(度)")]
+    [SerializeField] private float floatTiltAmplitude = 4f;
+
+    [Tooltip("漂う速さ")]
+    [SerializeField] private float floatSpeed = 1f;
 
     [Header("潰れる設定")]
     [Tooltip("つついた時にどれくらい潰れるか(0.3 = Y方向30%縮んでX/Zに広がる)")]
@@ -33,10 +46,18 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
     private Vector3 scaleVelocity;
     private bool isPoked;
 
+    private Vector3 anchorPosition;
+    private float floatTimeOffset;
+    private bool isDragging;
+    private Camera dragCamera;
+    private float dragDepth;
+
     private void Awake()
     {
         baseScale = transform.localScale;
         currentScale = baseScale;
+        anchorPosition = transform.position;
+        floatTimeOffset = Random.Range(0f, 100f);
 
         if (face == null)
         {
@@ -73,8 +94,43 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
         if (limbs != null) limbs.OnRelease();
     }
 
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        dragCamera = eventData.pressEventCamera != null ? eventData.pressEventCamera : Camera.main;
+        dragDepth = dragCamera.WorldToScreenPoint(transform.position).z;
+        isDragging = true;
+    }
+
+    public void OnDrag(PointerEventData eventData)
+    {
+        if (dragCamera == null) return;
+
+        Vector3 screenPoint = new Vector3(eventData.position.x, eventData.position.y, dragDepth);
+        Vector3 worldPoint = dragCamera.ScreenToWorldPoint(screenPoint);
+        transform.position = new Vector3(worldPoint.x, worldPoint.y, transform.position.z);
+    }
+
+    public void OnEndDrag(PointerEventData eventData)
+    {
+        isDragging = false;
+        anchorPosition = transform.position;
+    }
+
     private void Update()
     {
+        if (!isDragging)
+        {
+            // 無重力空間を漂っているような、ゆっくりとした上下左右の動きと傾き
+            float t = (Time.time + floatTimeOffset) * floatSpeed;
+            Vector3 floatOffset = new Vector3(
+                Mathf.Sin(t * 0.6f + 1.3f) * floatAmplitudeX,
+                Mathf.Sin(t) * floatAmplitudeY,
+                0f);
+
+            transform.position = anchorPosition + floatOffset;
+            transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Sin(t * 0.8f + 0.5f) * floatTiltAmplitude);
+        }
+
         if (isPoked)
         {
             // Y方向(高さ)を潰し、X/Z方向(幅・奥行き)に広げる
