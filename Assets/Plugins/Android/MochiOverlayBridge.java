@@ -30,10 +30,10 @@ public class MochiOverlayBridge {
 
     public static void startOverlay(Context context) {
         if (!canDrawOverlays(context)) return;
-        context.startService(new Intent(context, MochiOverlayService.class));
+        context.startService(new Intent(context, MochiUnityOverlayService.class));
     }
 
     public static void stopOverlay(Context context) {
-        context.stopService(new Intent(context, MochiOverlayService.class));
+        context.stopService(new Intent(context, MochiUnityOverlayService.class));
     }
 }
