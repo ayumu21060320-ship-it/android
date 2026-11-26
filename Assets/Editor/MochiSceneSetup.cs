@@ -15,7 +15,9 @@ public static class MochiSceneSetup
         Material mochiMat = EnsureMochiMaterial();
         GameObject mochi = EnsureMochiBody(mochiMat);
         GameObject face = EnsureFace(mochi);
-        AttachScripts(mochi, face);
+        EnsureVisor(mochi);
+        GameObject[] limbTransforms = EnsureLimbs(mochi, mochiMat);
+        AttachScripts(mochi, face, limbTransforms);
 
         Selection.activeGameObject = mochi;
         EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
@@ -127,7 +129,78 @@ public static class MochiSceneSetup
         return face;
     }
 
-    private static void AttachScripts(GameObject mochi, GameObject face)
+    private static void EnsureVisor(GameObject mochi)
+    {
+        Transform existing = mochi.transform.Find("Visor");
+        GameObject visor;
+
+        if (existing == null)
+        {
+            visor = new GameObject("Visor", typeof(SpriteRenderer));
+            visor.transform.SetParent(mochi.transform);
+            Undo.RegisterCreatedObjectUndo(visor, "Create Visor");
+        }
+        else
+        {
+            visor = existing.gameObject;
+        }
+
+        // 顔(Face)のすぐ後ろに、少し大きい濃紺の円を置いてヘルメットのバイザー風に見せる
+        visor.transform.localPosition = new Vector3(0f, 0f, -0.45f);
+        visor.transform.localScale = new Vector3(0.4f, 0.4f, 0.4f);
+
+        var sr = visor.GetComponent<SpriteRenderer>();
+        if (sr.sprite == null)
+        {
+            sr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
+        }
+        sr.color = new Color(0.08f, 0.1f, 0.2f);
+    }
+
+    private static GameObject EnsureLimb(GameObject mochi, Material mat, string name, Vector3 localPos, Vector3 localEuler, Vector3 localScale)
+    {
+        Transform existing = mochi.transform.Find(name);
+        GameObject limb;
+
+        if (existing == null)
+        {
+            limb = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            limb.name = name;
+            limb.transform.SetParent(mochi.transform);
+            Undo.RegisterCreatedObjectUndo(limb, "Create " + name);
+        }
+        else
+        {
+            limb = existing.gameObject;
+        }
+
+        limb.transform.localPosition = localPos;
+        limb.transform.localRotation = Quaternion.Euler(localEuler);
+        limb.transform.localScale = localScale;
+
+        if (mat != null)
+        {
+            limb.GetComponent<Renderer>().sharedMaterial = mat;
+        }
+
+        return limb;
+    }
+
+    private static GameObject[] EnsureLimbs(GameObject mochi, Material mat)
+    {
+        GameObject armLeft = EnsureLimb(mochi, mat, "ArmLeft",
+            new Vector3(-0.55f, 0.05f, 0f), new Vector3(0f, 0f, 70f), new Vector3(0.18f, 0.35f, 0.18f));
+        GameObject armRight = EnsureLimb(mochi, mat, "ArmRight",
+            new Vector3(0.55f, 0.05f, 0f), new Vector3(0f, 0f, -70f), new Vector3(0.18f, 0.35f, 0.18f));
+        GameObject legLeft = EnsureLimb(mochi, mat, "LegLeft",
+            new Vector3(-0.25f, -0.55f, 0f), new Vector3(0f, 0f, 15f), new Vector3(0.18f, 0.35f, 0.18f));
+        GameObject legRight = EnsureLimb(mochi, mat, "LegRight",
+            new Vector3(0.25f, -0.55f, 0f), new Vector3(0f, 0f, -15f), new Vector3(0.18f, 0.35f, 0.18f));
+
+        return new[] { armLeft, armRight, legLeft, legRight };
+    }
+
+    private static void AttachScripts(GameObject mochi, GameObject face, GameObject[] limbTransforms)
     {
         var faceScript = face.GetComponent<MochiFace>();
         if (faceScript == null) faceScript = face.AddComponent<MochiFace>();
@@ -140,9 +213,28 @@ public static class MochiSceneSetup
         }
         faceSo.ApplyModifiedPropertiesWithoutUndo();
 
-        if (mochi.GetComponent<MochiBody>() == null)
+        var limbsScript = mochi.GetComponent<MochiLimbs>();
+        if (limbsScript == null) limbsScript = mochi.AddComponent<MochiLimbs>();
+
+        var limbsSo = new SerializedObject(limbsScript);
+        var limbsProp = limbsSo.FindProperty("limbs");
+        limbsProp.arraySize = limbTransforms.Length;
+        for (int i = 0; i < limbTransforms.Length; i++)
         {
-            mochi.AddComponent<MochiBody>();
+            var element = limbsProp.GetArrayElementAtIndex(i);
+            element.FindPropertyRelative("transform").objectReferenceValue = limbTransforms[i].transform;
         }
+        limbsSo.ApplyModifiedPropertiesWithoutUndo();
+
+        var bodyScript = mochi.GetComponent<MochiBody>();
+        if (bodyScript == null) bodyScript = mochi.AddComponent<MochiBody>();
+
+        var bodySo = new SerializedObject(bodyScript);
+        var limbsFieldProp = bodySo.FindProperty("limbs");
+        if (limbsFieldProp.objectReferenceValue == null)
+        {
+            limbsFieldProp.objectReferenceValue = limbsScript;
+        }
+        bodySo.ApplyModifiedPropertiesWithoutUndo();
     }
 }

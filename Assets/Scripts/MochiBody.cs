@@ -11,6 +11,9 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
     [Tooltip("顔パーツを管理しているMochiFace。未設定なら自動で子から探します。")]
     [SerializeField] private MochiFace face;
 
+    [Tooltip("手足を管理しているMochiLimbs。未設定なら自動で同じGameObjectから探します。")]
+    [SerializeField] private MochiLimbs limbs;
+
     [Header("潰れる設定")]
     [Tooltip("つついた時にどれくらい潰れるか(0.3 = Y方向30%縮んでX/Zに広がる)")]
     [SerializeField, Range(0f, 0.6f)] private float squashAmount = 0.3f;
@@ -39,12 +42,18 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
         {
             face = GetComponentInChildren<MochiFace>();
         }
+
+        if (limbs == null)
+        {
+            limbs = GetComponent<MochiLimbs>();
+        }
     }
 
     public void OnPointerDown(PointerEventData eventData)
     {
         isPoked = true;
         if (face != null) face.SetExpression(MochiFace.Expression.Poked);
+        if (limbs != null) limbs.OnPoke();
     }
 
     public void OnPointerUp(PointerEventData eventData)
@@ -61,6 +70,7 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
     {
         isPoked = false;
         if (face != null) face.SetExpression(MochiFace.Expression.Idle);
+        if (limbs != null) limbs.OnRelease();
     }
 
     private void Update()
