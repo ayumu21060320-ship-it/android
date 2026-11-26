@@ -18,6 +18,8 @@ class MochiNotificationListener : NotificationListenerService() {
 
     private lateinit var prefs: Prefs
     private val lastAnnounce = HashMap<String, Long>()
+    /** もう教えた通知(更新されても2回目は教えない) */
+    private val seenKeys = HashSet<String>()
 
     override fun onCreate() {
         super.onCreate()
@@ -30,15 +32,17 @@ class MochiNotificationListener : NotificationListenerService() {
         val isTest = sbn.packageName == packageName && n.extras.getBoolean(EXTRA_TEST)
         if (sbn.packageName == packageName && !isTest) return
         val pkg = sbn.packageName
-        // 常駐通知・まとめ通知・音楽プレーヤーなどは無視
-        if (sbn.isOngoing || n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+        // まとめ通知は中身がないので無視
+        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+        // 同じ通知の更新(タイマーのカウントダウンなど)は、最初の1回だけ扱う
+        val firstTime = seenKeys.add(sbn.key)
 
         val extras = n.extras
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
         val text = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT) ?: extras.getCharSequence(Notification.EXTRA_TEXT))?.toString()
         val label = if (isTest) "テスト支払い" else appLabel(pkg)
 
-        if (isTest || pkg in prefs.paymentApps) {
+        if (!sbn.isOngoing && (isTest || pkg in prefs.paymentApps)) {
             val pay = PaymentParser.parse(title, text)
             if (pay != null) {
                 val money = MoneyStore(this)
@@ -74,10 +78,11 @@ class MochiNotificationListener : NotificationListenerService() {
             }
         }
 
-        if (pkg in prefs.announceApps) {
-            // 同じアプリから立て続けに来た時は、少し間をあける
+        if (pkg in prefs.announceApps && firstTime) {
+            // 同じアプリから立て続けに来た時は、少し間をあける(アラームは別)
+            val isAlarm = n.category == Notification.CATEGORY_ALARM
             val now = System.currentTimeMillis()
-            if (now - (lastAnnounce[pkg] ?: 0L) < 8_000) return
+            if (!isAlarm && now - (lastAnnounce[pkg] ?: 0L) < 8_000) return
             lastAnnounce[pkg] = now
             val who = title?.takeIf { it.isNotBlank() }
             val body = text?.replace('\n', ' ')?.let { if (it.length > 40) it.take(40) + "…" else it }
@@ -91,10 +96,11 @@ class MochiNotificationListener : NotificationListenerService() {
                         body = if (prefs.announceBody) body else null,
                         onOpen = open?.let { pi -> { sendIntent(pi) } },
                     ),
-                    line = "${label}から通知が来ましたよ！",
+                    line = if (isAlarm) "${prefs.masterName}、アラームの時間ですよ〜！起きてください！"
+                    else "${label}から通知が来ましたよ！",
                 )
             } else {
-                val msg = buildString {
+                val msg = if (isAlarm) "${prefs.masterName}、アラームの時間ですよ〜！起きてください！" else buildString {
                     append("${label}から通知です")
                     if (who != null) append("、${who}")
                     append("！")
@@ -103,6 +109,10 @@ class MochiNotificationListener : NotificationListenerService() {
                 OverlayService.say(msg)
             }
         }
+    }
+
+    override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        seenKeys.remove(sbn.key)
     }
 
     /** 通知をタップした時と同じように、そのアプリを開く */
