@@ -21,27 +21,27 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
     [Tooltip("飛んでいく最大の速さ")]
     [SerializeField] private float maxLaunchSpeed = 5f;
 
-    [Tooltip("飛んでいる間、1秒あたりどれくらい減速するか(エアホッケーらしく、小さめの値で滑らせる)")]
-    [SerializeField] private float flightDamping = 0.4f;
+    [Tooltip("飛んでいる間、1秒あたりどれくらい減速するか(小さいほど、壁に何度もバウンドし続ける)")]
+    [SerializeField] private float flightDamping = 0.15f;
 
     [Tooltip("これより遅くなったら飛ぶのをやめて、浮遊に戻る")]
-    [SerializeField] private float minFlightSpeed = 0.1f;
+    [SerializeField] private float minFlightSpeed = 0.08f;
 
     [Tooltip("カメラに映る画面の端から、どれくらい手前で跳ね返るか")]
     [SerializeField] private float edgeMargin = 0.5f;
 
-    [Tooltip("端で跳ね返った時に、どれくらい勢いが残るか(1に近いほどよく弾む)")]
-    [SerializeField, Range(0f, 1f)] private float bounceDamping = 0.85f;
+    [Tooltip("端で跳ね返った時に、どれくらい勢いが残るか(1に近いほどよく弾み、何度もバウンドする)")]
+    [SerializeField, Range(0f, 1f)] private float bounceDamping = 0.92f;
 
     [Header("無重力でふわふわ漂う設定")]
     [Tooltip("上下に漂う高さ")]
-    [SerializeField] private float floatAmplitudeY = 0.15f;
+    [SerializeField] private float floatAmplitudeY = 0.3f;
 
     [Tooltip("左右に漂う幅")]
-    [SerializeField] private float floatAmplitudeX = 0.08f;
+    [SerializeField] private float floatAmplitudeX = 0.18f;
 
     [Tooltip("ゆらゆら傾く角度(度)")]
-    [SerializeField] private float floatTiltAmplitude = 4f;
+    [SerializeField] private float floatTiltAmplitude = 8f;
 
     [Tooltip("漂う速さ")]
     [SerializeField] private float floatSpeed = 1f;
@@ -75,6 +75,7 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
 
     private bool isFlying;
     private Vector3 flightVelocity;
+    private Vector3 flightBasePosition;
 
     private Camera viewCamera;
     private Vector2 boundsMin;
@@ -177,6 +178,7 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
         if (launchVelocity.magnitude > minFlightSpeed)
         {
             flightVelocity = launchVelocity;
+            flightBasePosition = transform.position;
             isFlying = true;
         }
         else
@@ -238,7 +240,8 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
     {
         RecalculateScreenBounds();
 
-        Vector3 position = transform.position + flightVelocity * Time.deltaTime;
+        // 物理的な移動(バウンド込み)はflightBasePositionだけで計算する
+        Vector3 position = flightBasePosition + flightVelocity * Time.deltaTime;
 
         // 空気抵抗はないはずだが、画面内に留まるようゆっくり減速させる
         flightVelocity *= Mathf.Clamp01(1f - flightDamping * Time.deltaTime);
@@ -255,7 +258,16 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
             position.y = Mathf.Clamp(position.y, boundsMin.y, boundsMax.y);
         }
 
-        transform.position = position;
+        flightBasePosition = position;
+
+        // 見た目だけ、飛んでいる最中も少し漂うように揺らす(物理には影響させない)
+        float t = (Time.time + floatTimeOffset) * floatSpeed;
+        Vector3 wobble = new Vector3(
+            Mathf.Sin(t * 1.7f) * floatAmplitudeX * 0.4f,
+            Mathf.Sin(t * 2.3f + 1f) * floatAmplitudeY * 0.4f,
+            0f);
+
+        transform.position = flightBasePosition + wobble;
 
         // 飛んでいく向きに合わせて少し傾ける
         float tilt = Mathf.Clamp(-flightVelocity.x * 5f, -30f, 30f);
@@ -264,7 +276,7 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
         if (flightVelocity.magnitude < minFlightSpeed)
         {
             isFlying = false;
-            anchorPosition = transform.position;
+            anchorPosition = flightBasePosition;
         }
     }
 }
