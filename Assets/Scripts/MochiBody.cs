@@ -14,6 +14,28 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
     [Tooltip("手足を管理しているMochiLimbs。未設定なら自動で同じGameObjectから探します。")]
     [SerializeField] private MochiLimbs limbs;
 
+    [Header("スワイプで吹っ飛ぶ設定")]
+    [Tooltip("スワイプの速さに対して、どれくらい勢いよく飛ばすか")]
+    [SerializeField] private float launchSpeedMultiplier = 1f;
+
+    [Tooltip("飛んでいく最大の速さ")]
+    [SerializeField] private float maxLaunchSpeed = 8f;
+
+    [Tooltip("飛んでいる間、1秒あたりどれくらい減速するか")]
+    [SerializeField] private float flightDamping = 1.2f;
+
+    [Tooltip("これより遅くなったら飛ぶのをやめて、浮遊に戻る")]
+    [SerializeField] private float minFlightSpeed = 0.1f;
+
+    [Tooltip("画面内に収めるための移動範囲(左下)")]
+    [SerializeField] private Vector2 boundsMin = new Vector2(-3f, -4f);
+
+    [Tooltip("画面内に収めるための移動範囲(右上)")]
+    [SerializeField] private Vector2 boundsMax = new Vector2(3f, 4f);
+
+    [Tooltip("端で跳ね返った時に、どれくらい勢いが残るか(1で跳ね返り後も同じ速さ)")]
+    [SerializeField, Range(0f, 1f)] private float bounceDamping = 0.6f;
+
     [Header("無重力でふわふわ漂う設定")]
     [Tooltip("上下に漂う高さ")]
     [SerializeField] private float floatAmplitudeY = 0.15f;
@@ -51,6 +73,11 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
     private bool isDragging;
     private Camera dragCamera;
     private float dragDepth;
+    private Vector3 lastDragWorldPosition;
+    private Vector3 dragVelocity;
+
+    private bool isFlying;
+    private Vector3 flightVelocity;
 
     private void Awake()
     {
@@ -99,6 +126,9 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
         dragCamera = eventData.pressEventCamera != null ? eventData.pressEventCamera : Camera.main;
         dragDepth = dragCamera.WorldToScreenPoint(transform.position).z;
         isDragging = true;
+        isFlying = false;
+        lastDragWorldPosition = transform.position;
+        dragVelocity = Vector3.zero;
     }
 
     public void OnDrag(PointerEventData eventData)
@@ -107,18 +137,49 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
 
         Vector3 screenPoint = new Vector3(eventData.position.x, eventData.position.y, dragDepth);
         Vector3 worldPoint = dragCamera.ScreenToWorldPoint(screenPoint);
-        transform.position = new Vector3(worldPoint.x, worldPoint.y, transform.position.z);
+        Vector3 newPosition = new Vector3(worldPoint.x, worldPoint.y, transform.position.z);
+
+        if (Time.deltaTime > 0f)
+        {
+            dragVelocity = (newPosition - lastDragWorldPosition) / Time.deltaTime;
+        }
+        lastDragWorldPosition = newPosition;
+
+        transform.position = newPosition;
     }
 
     public void OnEndDrag(PointerEventData eventData)
     {
         isDragging = false;
-        anchorPosition = transform.position;
+
+        Vector3 launchVelocity = dragVelocity * launchSpeedMultiplier;
+        if (launchVelocity.magnitude > maxLaunchSpeed)
+        {
+            launchVelocity = launchVelocity.normalized * maxLaunchSpeed;
+        }
+
+        if (launchVelocity.magnitude > minFlightSpeed)
+        {
+            flightVelocity = launchVelocity;
+            isFlying = true;
+        }
+        else
+        {
+            anchorPosition = transform.position;
+        }
     }
 
     private void Update()
     {
-        if (!isDragging)
+        if (isDragging)
+        {
+            // 位置はOnDragで直接動かしているので、ここでは何もしない
+        }
+        else if (isFlying)
+        {
+            UpdateFlight();
+        }
+        else
         {
             // 無重力空間を漂っているような、ゆっくりとした上下左右の動きと傾き
             float t = (Time.time + floatTimeOffset) * floatSpeed;
@@ -155,5 +216,37 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
         }
 
         transform.localScale = currentScale;
+    }
+
+    private void UpdateFlight()
+    {
+        Vector3 position = transform.position + flightVelocity * Time.deltaTime;
+
+        // 空気抵抗はないはずだが、画面内に留まるようゆっくり減速させる
+        flightVelocity *= Mathf.Clamp01(1f - flightDamping * Time.deltaTime);
+
+        if (position.x < boundsMin.x || position.x > boundsMax.x)
+        {
+            flightVelocity.x = -flightVelocity.x * bounceDamping;
+            position.x = Mathf.Clamp(position.x, boundsMin.x, boundsMax.x);
+        }
+
+        if (position.y < boundsMin.y || position.y > boundsMax.y)
+        {
+            flightVelocity.y = -flightVelocity.y * bounceDamping;
+            position.y = Mathf.Clamp(position.y, boundsMin.y, boundsMax.y);
+        }
+
+        transform.position = position;
+
+        // 飛んでいく向きに合わせて少し傾ける
+        float tilt = Mathf.Clamp(-flightVelocity.x * 5f, -30f, 30f);
+        transform.rotation = Quaternion.Euler(0f, 0f, tilt);
+
+        if (flightVelocity.magnitude < minFlightSpeed)
+        {
+            isFlying = false;
+            anchorPosition = transform.position;
+        }
     }
 }
