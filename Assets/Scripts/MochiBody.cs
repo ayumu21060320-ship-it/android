@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -9,7 +8,7 @@ using UnityEngine.EventSystems;
 public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
 {
     // ダブルタップされた時に呼ばれます(設定パネルの開閉などに使えます)。
-    public event Action OnDoubleTapped;
+    public event System.Action OnDoubleTapped;
 
 
     [Header("参照")]
