@@ -64,9 +64,9 @@ public static class MochiSceneSetup
         WeatherService weatherService = EnsureWeatherComponents(mochi, speechText);
         GameObject[] locationObjects = EnsureLocationUI(weatherService);
         GameObject healthPanel = EnsureHealthPanel();
-        (GameObject categoryPanel, Toggle weatherToggle, Toggle healthToggle, Button nextButton) = EnsureCategoryPanel();
+        (GameObject categoryPanel, Toggle weatherToggle, Toggle healthToggle, Toggle overlayToggle, Button nextButton) = EnsureCategoryPanel();
         GameObject okBar = EnsureOkBar(out Button okButton);
-        EnsureAppController(mochi, speechText, locationObjects, healthPanel, categoryPanel, weatherToggle, healthToggle, nextButton, okBar, okButton, weatherService);
+        EnsureAppController(mochi, speechText, locationObjects, healthPanel, categoryPanel, weatherToggle, healthToggle, overlayToggle, nextButton, okBar, okButton, weatherService);
 
         Selection.activeGameObject = mochi;
         EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
@@ -904,6 +904,7 @@ public static class MochiSceneSetup
         GameObject categoryPanel,
         Toggle weatherToggle,
         Toggle healthToggle,
+        Toggle overlayToggle,
         Button categoryNextButton,
         GameObject okBar,
         Button okButton,
@@ -912,11 +913,16 @@ public static class MochiSceneSetup
         var controller = mochi.GetComponent<MochiAppController>();
         if (controller == null) controller = mochi.AddComponent<MochiAppController>();
 
+        var overlayBridge = mochi.GetComponent<AndroidOverlayBridge>();
+        if (overlayBridge == null) overlayBridge = mochi.AddComponent<AndroidOverlayBridge>();
+
         var so = new SerializedObject(controller);
 
         so.FindProperty("categoryPanel").objectReferenceValue = categoryPanel;
         so.FindProperty("wantWeatherToggle").objectReferenceValue = weatherToggle;
         so.FindProperty("wantHealthToggle").objectReferenceValue = healthToggle;
+        so.FindProperty("wantOverlayToggle").objectReferenceValue = overlayToggle;
+        so.FindProperty("overlayBridge").objectReferenceValue = overlayBridge;
         so.FindProperty("categoryNextButton").objectReferenceValue = categoryNextButton;
 
         var weatherSettingsProp = so.FindProperty("weatherSettingsObjects");
@@ -951,7 +957,7 @@ public static class MochiSceneSetup
         so.ApplyModifiedPropertiesWithoutUndo();
     }
 
-    private static (GameObject panel, Toggle weatherToggle, Toggle healthToggle, Button nextButton) EnsureCategoryPanel()
+    private static (GameObject panel, Toggle weatherToggle, Toggle healthToggle, Toggle overlayToggle, Button nextButton) EnsureCategoryPanel()
     {
         GameObject canvasGo = GameObject.Find("CategoryCanvas");
         if (canvasGo == null)
@@ -983,9 +989,10 @@ public static class MochiSceneSetup
         CreateLayoutText(panel, "TitleText", 100f, "なにをお世話してほしい?", 44);
         Toggle weatherToggle = CreateLayoutToggle(panel, "WantWeatherToggle", 80f, "天気を教えてほしい");
         Toggle healthToggle = CreateLayoutToggle(panel, "WantHealthToggle", 80f, "健康管理をしてほしい");
+        Toggle overlayToggle = CreateLayoutToggle(panel, "WantOverlayToggle", 80f, "ホーム画面にも浮かべたい");
         Button nextButton = CreateLayoutButton(panel, "NextButton", 100f, "つぎへ");
 
-        return (panel, weatherToggle, healthToggle, nextButton);
+        return (panel, weatherToggle, healthToggle, overlayToggle, nextButton);
     }
 
     private static GameObject EnsureOkBar(out Button okButton)

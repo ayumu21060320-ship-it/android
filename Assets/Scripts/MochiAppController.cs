@@ -5,14 +5,19 @@ using UnityEngine.UI;
 // 1. 起動直後は「何をお世話してほしいか」を選ぶ画面だけ表示(天気・健康管理など)
 // 2. 選んだ項目の入力欄だけが表示される
 // 3. 下部の「はじめる」ボタンを押すとキャラが登場し、以後はこれらの画面は隠れる
-// 4. キャラをダブルタップすると、選んだ項目の入力欄をまた開ける
+// 4. キャラをダブルタップすると、カテゴリー選択画面ごと再び開く。
+//    ここでチェックを付け外しして「つぎへ」を押せば、項目の追加・削除も後からできる。
 public class MochiAppController : MonoBehaviour
 {
     [Header("お世話カテゴリーを選ぶ画面(最初に出る)")]
     [SerializeField] private GameObject categoryPanel;
     [SerializeField] private Toggle wantWeatherToggle;
     [SerializeField] private Toggle wantHealthToggle;
+    [SerializeField] private Toggle wantOverlayToggle;
     [SerializeField] private Button categoryNextButton;
+
+    [Header("ホーム画面オーバーレイ(Android実機のみ)")]
+    [SerializeField] private AndroidOverlayBridge overlayBridge;
 
     [Header("選んだ項目ごとの入力画面")]
     [Tooltip("天気を選んだ時だけ表示するもの(場所の検索欄など)")]
@@ -44,9 +49,11 @@ public class MochiAppController : MonoBehaviour
     private const string OnboardedKey = "Mochi_HasOnboarded";
     private const string WantWeatherKey = "Mochi_WantWeather";
     private const string WantHealthKey = "Mochi_WantHealth";
+    private const string WantOverlayKey = "Mochi_WantOverlay";
 
     private bool wantWeather = true;
     private bool wantHealth = true;
+    private bool wantOverlay;
 
     private void Awake()
     {
@@ -72,6 +79,7 @@ public class MochiAppController : MonoBehaviour
         bool hasOnboarded = PlayerPrefs.GetInt(OnboardedKey, 0) == 1;
         wantWeather = PlayerPrefs.GetInt(WantWeatherKey, 1) == 1;
         wantHealth = PlayerPrefs.GetInt(WantHealthKey, 1) == 1;
+        wantOverlay = PlayerPrefs.GetInt(WantOverlayKey, 0) == 1;
 
         if (hasOnboarded)
         {
@@ -80,6 +88,11 @@ public class MochiAppController : MonoBehaviour
             SetActive(okBarRoot, false);
             SetActive(mochiRoot, true);
             if (weatherService != null) weatherService.enabled = wantWeather;
+
+            if (wantOverlay && overlayBridge != null)
+            {
+                overlayBridge.StartOverlay();
+            }
         }
         else
         {
@@ -91,6 +104,7 @@ public class MochiAppController : MonoBehaviour
 
             if (wantWeatherToggle != null) wantWeatherToggle.isOn = wantWeather;
             if (wantHealthToggle != null) wantHealthToggle.isOn = wantHealth;
+            if (wantOverlayToggle != null) wantOverlayToggle.isOn = wantOverlay;
         }
     }
 
@@ -98,9 +112,11 @@ public class MochiAppController : MonoBehaviour
     {
         wantWeather = wantWeatherToggle == null || wantWeatherToggle.isOn;
         wantHealth = wantHealthToggle == null || wantHealthToggle.isOn;
+        wantOverlay = wantOverlayToggle != null && wantOverlayToggle.isOn;
 
         PlayerPrefs.SetInt(WantWeatherKey, wantWeather ? 1 : 0);
         PlayerPrefs.SetInt(WantHealthKey, wantHealth ? 1 : 0);
+        PlayerPrefs.SetInt(WantOverlayKey, wantOverlay ? 1 : 0);
         PlayerPrefs.Save();
 
         if (weatherService != null) weatherService.enabled = wantWeather;
@@ -125,14 +141,52 @@ public class MochiAppController : MonoBehaviour
             speechText.text = "はじめまして!今日からお世話するね!";
         }
         SetActive(speechBubbleRoot, true);
+
+        ApplyOverlayPreference();
+    }
+
+    private void ApplyOverlayPreference()
+    {
+        if (overlayBridge == null) return;
+
+        if (!wantOverlay)
+        {
+            overlayBridge.StopOverlay();
+            return;
+        }
+
+        if (overlayBridge.CanDrawOverlays())
+        {
+            overlayBridge.StartOverlay();
+        }
+        else
+        {
+            // 許可が必要なので設定画面を開く。許可後にもう一度「はじめる」を押すとオーバーレイが起動する。
+            overlayBridge.RequestOverlayPermission();
+        }
     }
 
     private void OnMochiDoubleTapped()
     {
-        bool currentlyVisible = okBarRoot != null && okBarRoot.activeSelf;
+        bool currentlyOpen = okBarRoot != null && okBarRoot.activeSelf;
 
-        ApplyCategoryVisibility(!currentlyVisible);
-        SetActive(okBarRoot, !currentlyVisible);
+        if (currentlyOpen)
+        {
+            SetActive(categoryPanel, false);
+            ApplyCategoryVisibility(false);
+            SetActive(okBarRoot, false);
+        }
+        else
+        {
+            // 今選んでいる項目を反映した状態で、カテゴリー選択からやり直せるようにする
+            if (wantWeatherToggle != null) wantWeatherToggle.isOn = wantWeather;
+            if (wantHealthToggle != null) wantHealthToggle.isOn = wantHealth;
+            if (wantOverlayToggle != null) wantOverlayToggle.isOn = wantOverlay;
+
+            SetActive(categoryPanel, true);
+            ApplyCategoryVisibility(true);
+            SetActive(okBarRoot, true);
+        }
     }
 
     private void ApplyCategoryVisibility(bool visible)
