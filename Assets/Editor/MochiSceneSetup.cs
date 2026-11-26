@@ -21,7 +21,8 @@ public static class MochiSceneSetup
         AttachScripts(mochi, face, limbTransforms);
 
         Text speechText = EnsureSpeechCanvas();
-        EnsureWeatherComponents(mochi, speechText);
+        WeatherService weatherService = EnsureWeatherComponents(mochi, speechText);
+        EnsureLocationUI(weatherService);
 
         Selection.activeGameObject = mochi;
         EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
@@ -296,7 +297,7 @@ public static class MochiSceneSetup
         return text;
     }
 
-    private static void EnsureWeatherComponents(GameObject mochi, Text speechText)
+    private static WeatherService EnsureWeatherComponents(GameObject mochi, Text speechText)
     {
         var weatherService = mochi.GetComponent<WeatherService>();
         if (weatherService == null) weatherService = mochi.AddComponent<WeatherService>();
@@ -325,5 +326,110 @@ public static class MochiSceneSetup
         }
 
         displaySo.ApplyModifiedPropertiesWithoutUndo();
+
+        return weatherService;
+    }
+
+    private static void EnsureLocationUI(WeatherService weatherService)
+    {
+        GameObject canvasGo = GameObject.Find("SpeechCanvas");
+        if (canvasGo == null) return;
+
+        Transform existingPanel = canvasGo.transform.Find("LocationPanel");
+        GameObject panel;
+
+        if (existingPanel == null)
+        {
+            panel = new GameObject("LocationPanel");
+            panel.transform.SetParent(canvasGo.transform, false);
+            Undo.RegisterCreatedObjectUndo(panel, "Create LocationPanel");
+        }
+        else
+        {
+            panel = existingPanel.gameObject;
+        }
+
+        var panelRect = EnsureRect(panel, new Vector2(0.1f, 0.03f), new Vector2(0.9f, 0.12f));
+
+        // 入力欄
+        GameObject inputGo = EnsureChild(panel, "CityInputField", typeof(InputField), typeof(Image));
+        EnsureRect(inputGo, new Vector2(0f, 0f), new Vector2(0.65f, 1f));
+        var inputField = inputGo.GetComponent<InputField>();
+        var inputImage = inputGo.GetComponent<Image>();
+        inputImage.color = new Color(1f, 1f, 1f, 0.9f);
+
+        GameObject placeholderGo = EnsureChild(inputGo, "Placeholder", typeof(Text));
+        EnsureRect(placeholderGo, Vector2.zero, Vector2.one);
+        var placeholderText = placeholderGo.GetComponent<Text>();
+        placeholderText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
+        placeholderText.text = "街の名前を入力(例: Tokyo)";
+        placeholderText.color = new Color(0f, 0f, 0f, 0.5f);
+        placeholderText.alignment = TextAnchor.MiddleLeft;
+
+        GameObject inputTextGo = EnsureChild(inputGo, "Text", typeof(Text));
+        EnsureRect(inputTextGo, Vector2.zero, Vector2.one);
+        var inputText = inputTextGo.GetComponent<Text>();
+        inputText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
+        inputText.color = Color.black;
+        inputText.alignment = TextAnchor.MiddleLeft;
+
+        inputField.textComponent = inputText;
+        inputField.placeholder = placeholderText;
+
+        // 検索ボタン
+        GameObject buttonGo = EnsureChild(panel, "SearchButton", typeof(Button), typeof(Image));
+        EnsureRect(buttonGo, new Vector2(0.7f, 0f), new Vector2(1f, 1f));
+        var buttonImage = buttonGo.GetComponent<Image>();
+        buttonImage.color = new Color(0.3f, 0.6f, 0.9f);
+
+        GameObject buttonTextGo = EnsureChild(buttonGo, "Text", typeof(Text));
+        EnsureRect(buttonTextGo, Vector2.zero, Vector2.one);
+        var buttonText = buttonTextGo.GetComponent<Text>();
+        buttonText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
+        buttonText.text = "検索";
+        buttonText.color = Color.white;
+        buttonText.alignment = TextAnchor.MiddleCenter;
+
+        // ステータス表示(入力欄の少し下)
+        GameObject statusGo = EnsureChild(canvasGo, "LocationStatusText", typeof(Text));
+        EnsureRect(statusGo, new Vector2(0.1f, -0.02f), new Vector2(0.9f, 0.03f));
+        var statusText = statusGo.GetComponent<Text>();
+        statusText.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
+        statusText.fontSize = 28;
+        statusText.alignment = TextAnchor.MiddleCenter;
+        statusText.color = Color.black;
+
+        var locationSettings = panel.GetComponent<LocationSettings>();
+        if (locationSettings == null) locationSettings = panel.AddComponent<LocationSettings>();
+
+        var so = new SerializedObject(locationSettings);
+        so.FindProperty("weatherService").objectReferenceValue = weatherService;
+        so.FindProperty("cityInputField").objectReferenceValue = inputField;
+        so.FindProperty("searchButton").objectReferenceValue = buttonGo.GetComponent<Button>();
+        so.FindProperty("statusText").objectReferenceValue = statusText;
+        so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    private static GameObject EnsureChild(GameObject parent, string name, params System.Type[] components)
+    {
+        Transform existing = parent.transform.Find(name);
+        if (existing != null) return existing.gameObject;
+
+        var go = new GameObject(name, components);
+        go.transform.SetParent(parent.transform, false);
+        Undo.RegisterCreatedObjectUndo(go, "Create " + name);
+        return go;
+    }
+
+    private static RectTransform EnsureRect(GameObject go, Vector2 anchorMin, Vector2 anchorMax)
+    {
+        var rect = go.GetComponent<RectTransform>();
+        if (rect == null) rect = go.AddComponent<RectTransform>();
+
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        return rect;
     }
 }

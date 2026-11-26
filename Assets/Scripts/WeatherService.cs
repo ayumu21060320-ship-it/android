@@ -19,10 +19,10 @@ public class WeatherService : MonoBehaviour
     }
 
     [Header("場所(緯度・経度)")]
-    [Tooltip("緯度。例: 東京は35.6762")]
+    [Tooltip("デフォルトの緯度。LocationSettingsで場所を選んでいればそちらが優先されます。例: 東京は35.6762")]
     [SerializeField] private float latitude = 35.6762f;
 
-    [Tooltip("経度。例: 東京は139.6503")]
+    [Tooltip("デフォルトの経度。LocationSettingsで場所を選んでいればそちらが優先されます。例: 東京は139.6503")]
     [SerializeField] private float longitude = 139.6503f;
 
     [Header("更新間隔")]
@@ -30,6 +30,9 @@ public class WeatherService : MonoBehaviour
     [SerializeField] private float refreshIntervalSeconds = 1800f;
 
     public event Action<float, WeatherCategory> OnWeatherUpdated;
+
+    private const string LatitudePrefKey = "Mochi_Weather_Latitude";
+    private const string LongitudePrefKey = "Mochi_Weather_Longitude";
 
     [Serializable]
     private class CurrentWeather
@@ -46,6 +49,27 @@ public class WeatherService : MonoBehaviour
 
     private void Start()
     {
+        if (PlayerPrefs.HasKey(LatitudePrefKey) && PlayerPrefs.HasKey(LongitudePrefKey))
+        {
+            latitude = PlayerPrefs.GetFloat(LatitudePrefKey);
+            longitude = PlayerPrefs.GetFloat(LongitudePrefKey);
+        }
+
+        StartCoroutine(RefreshLoop());
+    }
+
+    // LocationSettingsなど、場所を選ぶUIから呼び出します。
+    // 次回以降も使えるよう保存し、すぐに最新の天気を取得し直します。
+    public void SetLocation(float newLatitude, float newLongitude)
+    {
+        latitude = newLatitude;
+        longitude = newLongitude;
+
+        PlayerPrefs.SetFloat(LatitudePrefKey, latitude);
+        PlayerPrefs.SetFloat(LongitudePrefKey, longitude);
+        PlayerPrefs.Save();
+
+        StopAllCoroutines();
         StartCoroutine(RefreshLoop());
     }
 
