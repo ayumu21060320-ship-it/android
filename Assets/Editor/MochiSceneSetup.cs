@@ -22,8 +22,9 @@ public static class MochiSceneSetup
 
         Text speechText = EnsureSpeechCanvas();
         WeatherService weatherService = EnsureWeatherComponents(mochi, speechText);
-        EnsureLocationUI(weatherService);
-        EnsureHealthPanel();
+        GameObject[] locationObjects = EnsureLocationUI(weatherService);
+        (GameObject healthPanel, Button okButton) = EnsureHealthPanel();
+        EnsureAppController(mochi, speechText, locationObjects, healthPanel, okButton);
 
         Selection.activeGameObject = mochi;
         EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
@@ -331,10 +332,10 @@ public static class MochiSceneSetup
         return weatherService;
     }
 
-    private static void EnsureLocationUI(WeatherService weatherService)
+    private static GameObject[] EnsureLocationUI(WeatherService weatherService)
     {
         GameObject canvasGo = GameObject.Find("SpeechCanvas");
-        if (canvasGo == null) return;
+        if (canvasGo == null) return new GameObject[0];
 
         Transform existingPanel = canvasGo.transform.Find("LocationPanel");
         GameObject panel;
@@ -409,6 +410,8 @@ public static class MochiSceneSetup
         so.FindProperty("searchButton").objectReferenceValue = buttonGo.GetComponent<Button>();
         so.FindProperty("statusText").objectReferenceValue = statusText;
         so.ApplyModifiedPropertiesWithoutUndo();
+
+        return new[] { panel, statusGo };
     }
 
     private static GameObject EnsureChild(GameObject parent, string name, params System.Type[] components)
@@ -434,7 +437,7 @@ public static class MochiSceneSetup
         return rect;
     }
 
-    private static void EnsureHealthPanel()
+    private static (GameObject panel, Button okButton) EnsureHealthPanel()
     {
         GameObject canvasGo = GameObject.Find("HealthCanvas");
         if (canvasGo == null)
@@ -487,6 +490,9 @@ public static class MochiSceneSetup
         Text foodLogText = CreateLayoutText(panel, "FoodLogText", 300f, "今日の合計: 0kcal", 24);
         foodLogText.alignment = TextAnchor.UpperLeft;
 
+        Button okButton = CreateLayoutButton(panel, "OkButton", 80f, "はじめる");
+        okButton.GetComponent<Image>().color = new Color(0.95f, 0.6f, 0.2f);
+
         var userProfile = canvasGo.GetComponent<UserProfile>();
         if (userProfile == null) userProfile = canvasGo.AddComponent<UserProfile>();
 
@@ -511,6 +517,8 @@ public static class MochiSceneSetup
         so.FindProperty("addFoodButton").objectReferenceValue = addFoodButton;
         so.FindProperty("foodLogText").objectReferenceValue = foodLogText;
         so.ApplyModifiedPropertiesWithoutUndo();
+
+        return (panel, okButton);
     }
 
     private static GameObject CreateLayoutChild(GameObject parent, string name, float preferredHeight, params System.Type[] components)
@@ -608,6 +616,34 @@ public static class MochiSceneSetup
         toggle.targetGraphic = bgGo.GetComponent<Image>();
         toggle.graphic = checkGo.GetComponent<Image>();
         return toggle;
+    }
+
+    private static void EnsureAppController(GameObject mochi, Text speechText, GameObject[] locationObjects, GameObject healthPanel, Button okButton)
+    {
+        var controller = mochi.GetComponent<MochiAppController>();
+        if (controller == null) controller = mochi.AddComponent<MochiAppController>();
+
+        var settingsPanels = new System.Collections.Generic.List<GameObject>(locationObjects);
+        if (healthPanel != null) settingsPanels.Add(healthPanel);
+
+        var so = new SerializedObject(controller);
+        so.FindProperty("mochiRoot").objectReferenceValue = mochi;
+        so.FindProperty("mochiBody").objectReferenceValue = mochi.GetComponent<MochiBody>();
+        so.FindProperty("okButton").objectReferenceValue = okButton;
+        so.FindProperty("speechText").objectReferenceValue = speechText;
+
+        var activeOnlyProp = so.FindProperty("activeOnlyObjects");
+        activeOnlyProp.arraySize = 1;
+        activeOnlyProp.GetArrayElementAtIndex(0).objectReferenceValue = speechText != null ? speechText.gameObject : null;
+
+        var settingsProp = so.FindProperty("settingsPanels");
+        settingsProp.arraySize = settingsPanels.Count;
+        for (int i = 0; i < settingsPanels.Count; i++)
+        {
+            settingsProp.GetArrayElementAtIndex(i).objectReferenceValue = settingsPanels[i];
+        }
+
+        so.ApplyModifiedPropertiesWithoutUndo();
     }
 
     private static void EnsureSliderVisuals(GameObject sliderGo)
