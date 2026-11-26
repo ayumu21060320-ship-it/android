@@ -1,0 +1,45 @@
+name: もちもちメイド APK をビルド
+
+on:
+  push:
+    paths:
+      - "mochi-android/**"
+      - ".github/workflows/mochi-android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mochi-android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: APK をビルド
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: ファイル名をそろえる
+        run: cp app/build/outputs/apk/debug/app-debug.apk mochi-maid.apk
+
+      # スマホのブラウザから直接ダウンロードできるよう、毎回「mochi-latest」リリースを最新の APK で置き換える
+      - name: 最新版としてリリースに置く
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete mochi-latest --yes --cleanup-tag || true
+          gh release create mochi-latest mochi-maid.apk \
+            --target "${GITHUB_SHA}" \
+            --prerelease \
+            --title "もちもちメイド 最新版" \
+            --notes "ブランチ ${GITHUB_REF_NAME} の最新ビルドです。Android のブラウザで mochi-maid.apk をタップしてダウンロード → インストールしてください。"
