@@ -23,9 +23,31 @@ public static class MochiSceneSetup
         return cachedUiFont;
     }
 
+    // InputField/Button/Toggle/Sliderの見た目部品一式(Unity標準のUI作成メニューと同じ素材)
+    private static DefaultControls.Resources GetUiResources()
+    {
+        return new DefaultControls.Resources
+        {
+            standard = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd"),
+            background = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Background.psd"),
+            inputField = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/InputFieldBackground.psd"),
+            knob = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd"),
+            checkmark = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Checkmark.psd"),
+            dropdown = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/DropdownArrow.psd"),
+            mask = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UIMask.psd"),
+        };
+    }
+
     [MenuItem("Mochi/Setup Scene")]
     public static void SetupScene()
     {
+        // スマホアプリなので縦向き固定にする
+        PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
+        PlayerSettings.allowedAutorotateToPortrait = true;
+        PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
+        PlayerSettings.allowedAutorotateToLandscapeLeft = false;
+        PlayerSettings.allowedAutorotateToLandscapeRight = false;
+
         EnsureEventSystem();
         Camera cam = EnsureCamera();
         Material mochiMat = EnsureMochiMaterial();
@@ -368,44 +390,27 @@ public static class MochiSceneSetup
 
         var panelRect = EnsureRect(panel, new Vector2(0.1f, 0.03f), new Vector2(0.9f, 0.12f));
 
-        // 入力欄
-        GameObject inputGo = EnsureChild(panel, "CityInputField", typeof(InputField), typeof(Image));
+        // 入力欄(Unity標準のInputField部品を使う)
+        GameObject inputGo = CreateInputFieldRaw(panel, "CityInputField");
         EnsureRect(inputGo, new Vector2(0f, 0f), new Vector2(0.65f, 1f));
         var inputField = inputGo.GetComponent<InputField>();
-        var inputImage = inputGo.GetComponent<Image>();
-        inputImage.color = new Color(1f, 1f, 1f, 0.9f);
 
-        GameObject placeholderGo = EnsureChild(inputGo, "Placeholder", typeof(Text));
-        EnsureRect(placeholderGo, Vector2.zero, Vector2.one);
-        var placeholderText = placeholderGo.GetComponent<Text>();
+        var placeholderText = inputField.placeholder.GetComponent<Text>();
         placeholderText.font = GetUiFont();
         placeholderText.text = "街の名前を入力(例: Tokyo)";
-        placeholderText.color = new Color(0f, 0f, 0f, 0.5f);
-        placeholderText.alignment = TextAnchor.MiddleLeft;
 
-        GameObject inputTextGo = EnsureChild(inputGo, "Text", typeof(Text));
-        EnsureRect(inputTextGo, Vector2.zero, Vector2.one);
-        var inputText = inputTextGo.GetComponent<Text>();
+        var inputText = inputField.textComponent;
         inputText.font = GetUiFont();
-        inputText.color = Color.black;
-        inputText.alignment = TextAnchor.MiddleLeft;
-
-        inputField.textComponent = inputText;
-        inputField.placeholder = placeholderText;
 
         // 検索ボタン
-        GameObject buttonGo = EnsureChild(panel, "SearchButton", typeof(Button), typeof(Image));
+        GameObject buttonGo = CreateButtonRaw(panel, "SearchButton");
         EnsureRect(buttonGo, new Vector2(0.7f, 0f), new Vector2(1f, 1f));
-        var buttonImage = buttonGo.GetComponent<Image>();
-        buttonImage.color = new Color(0.3f, 0.6f, 0.9f);
+        buttonGo.GetComponent<Image>().color = new Color(0.3f, 0.6f, 0.9f);
 
-        GameObject buttonTextGo = EnsureChild(buttonGo, "Text", typeof(Text));
-        EnsureRect(buttonTextGo, Vector2.zero, Vector2.one);
-        var buttonText = buttonTextGo.GetComponent<Text>();
+        var buttonText = buttonGo.GetComponentInChildren<Text>();
         buttonText.font = GetUiFont();
         buttonText.text = "検索";
         buttonText.color = Color.white;
-        buttonText.alignment = TextAnchor.MiddleCenter;
 
         // ステータス表示(入力欄の少し下)
         GameObject statusGo = EnsureChild(canvasGo, "LocationStatusText", typeof(Text));
@@ -488,12 +493,10 @@ public static class MochiSceneSetup
 
         Toggle isMaleToggle = CreateLayoutToggle(panel, "IsMaleToggle", 50f, "男性");
 
-        GameObject sliderGo = CreateLayoutChild(panel, "ActivitySlider", 50f, typeof(Slider));
-        Slider activitySlider = sliderGo.GetComponent<Slider>();
+        Slider activitySlider = CreateLayoutSlider(panel, "ActivitySlider", 60f);
         activitySlider.minValue = 0;
         activitySlider.maxValue = 2;
         activitySlider.wholeNumbers = true;
-        EnsureSliderVisuals(sliderGo);
 
         Button saveButton = CreateLayoutButton(panel, "SaveProfileButton", 60f, "保存して計算");
         Text calorieGoalText = CreateLayoutText(panel, "CalorieGoalText", 50f, "1日の目安: -- kcal", 28);
@@ -536,21 +539,73 @@ public static class MochiSceneSetup
         return (panel, okButton);
     }
 
-    private static GameObject CreateLayoutChild(GameObject parent, string name, float preferredHeight, params System.Type[] components)
-    {
-        GameObject go = EnsureChild(parent, name, components);
+    // --- Unity標準のUI作成メニューと同じ部品(DefaultControls)をそのまま使う生成ヘルパー ---
 
+    private static GameObject CreateInputFieldRaw(GameObject parent, string name)
+    {
+        Transform existing = parent.transform.Find(name);
+        if (existing != null) return existing.gameObject;
+
+        GameObject go = DefaultControls.CreateInputField(GetUiResources());
+        go.name = name;
+        go.transform.SetParent(parent.transform, false);
+        Undo.RegisterCreatedObjectUndo(go, "Create " + name);
+        return go;
+    }
+
+    private static GameObject CreateButtonRaw(GameObject parent, string name)
+    {
+        Transform existing = parent.transform.Find(name);
+        if (existing != null) return existing.gameObject;
+
+        GameObject go = DefaultControls.CreateButton(GetUiResources());
+        go.name = name;
+        go.transform.SetParent(parent.transform, false);
+        Undo.RegisterCreatedObjectUndo(go, "Create " + name);
+        return go;
+    }
+
+    private static GameObject CreateToggleRaw(GameObject parent, string name)
+    {
+        Transform existing = parent.transform.Find(name);
+        if (existing != null) return existing.gameObject;
+
+        GameObject go = DefaultControls.CreateToggle(GetUiResources());
+        go.name = name;
+        go.transform.SetParent(parent.transform, false);
+        Undo.RegisterCreatedObjectUndo(go, "Create " + name);
+        return go;
+    }
+
+    private static GameObject CreateSliderRaw(GameObject parent, string name)
+    {
+        Transform existing = parent.transform.Find(name);
+        if (existing != null) return existing.gameObject;
+
+        GameObject go = DefaultControls.CreateSlider(GetUiResources());
+        go.name = name;
+        go.transform.SetParent(parent.transform, false);
+        Undo.RegisterCreatedObjectUndo(go, "Create " + name);
+        return go;
+    }
+
+    private static T AddLayoutElement<T>(GameObject go, float preferredHeight) where T : Component
+    {
         var layoutElement = go.GetComponent<LayoutElement>();
         if (layoutElement == null) layoutElement = go.AddComponent<LayoutElement>();
         layoutElement.preferredHeight = preferredHeight;
         layoutElement.flexibleWidth = 1f;
 
-        return go;
+        return go.GetComponent<T>();
     }
+
+    // --- VerticalLayoutGroupの中に並べる、見出し・入力欄・ボタン・トグル・スライダー ---
 
     private static Text CreateLayoutText(GameObject parent, string name, float height, string defaultText, int fontSize)
     {
-        GameObject go = CreateLayoutChild(parent, name, height, typeof(Text));
+        GameObject go = EnsureChild(parent, name, typeof(Text));
+        AddLayoutElement<Text>(go, height);
+
         var text = go.GetComponent<Text>();
         text.font = GetUiFont();
         text.fontSize = fontSize;
@@ -562,75 +617,51 @@ public static class MochiSceneSetup
 
     private static InputField CreateLayoutInputField(GameObject parent, string name, float height, string placeholder)
     {
-        GameObject go = CreateLayoutChild(parent, name, height, typeof(InputField), typeof(Image));
-        go.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.95f);
+        GameObject go = CreateInputFieldRaw(parent, name);
+        var inputField = AddLayoutElement<InputField>(go, height);
 
-        GameObject placeholderGo = EnsureChild(go, "Placeholder", typeof(Text));
-        EnsureRect(placeholderGo, Vector2.zero, Vector2.one);
-        var placeholderText = placeholderGo.GetComponent<Text>();
+        var placeholderText = inputField.placeholder.GetComponent<Text>();
         placeholderText.font = GetUiFont();
         placeholderText.text = placeholder;
-        placeholderText.color = new Color(0f, 0f, 0f, 0.5f);
-        placeholderText.alignment = TextAnchor.MiddleLeft;
 
-        GameObject textGo = EnsureChild(go, "Text", typeof(Text));
-        EnsureRect(textGo, Vector2.zero, Vector2.one);
-        var text = textGo.GetComponent<Text>();
+        var text = inputField.textComponent;
         text.font = GetUiFont();
-        text.color = Color.black;
-        text.alignment = TextAnchor.MiddleLeft;
 
-        var inputField = go.GetComponent<InputField>();
-        inputField.textComponent = text;
-        inputField.placeholder = placeholderText;
         return inputField;
     }
 
     private static Button CreateLayoutButton(GameObject parent, string name, float height, string label)
     {
-        GameObject go = CreateLayoutChild(parent, name, height, typeof(Button), typeof(Image));
+        GameObject go = CreateButtonRaw(parent, name);
+        var button = AddLayoutElement<Button>(go, height);
+
         go.GetComponent<Image>().color = new Color(0.3f, 0.6f, 0.9f);
 
-        GameObject textGo = EnsureChild(go, "Text", typeof(Text));
-        EnsureRect(textGo, Vector2.zero, Vector2.one);
-        var text = textGo.GetComponent<Text>();
+        var text = go.GetComponentInChildren<Text>();
         text.font = GetUiFont();
         text.text = label;
         text.color = Color.white;
-        text.alignment = TextAnchor.MiddleCenter;
 
-        return go.GetComponent<Button>();
+        return button;
     }
 
     private static Toggle CreateLayoutToggle(GameObject parent, string name, float height, string label)
     {
-        GameObject go = CreateLayoutChild(parent, name, height, typeof(Toggle));
+        GameObject go = CreateToggleRaw(parent, name);
+        var toggle = AddLayoutElement<Toggle>(go, height);
 
-        GameObject bgGo = EnsureChild(go, "Background", typeof(Image));
-        EnsureRect(bgGo, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f));
-        bgGo.GetComponent<RectTransform>().sizeDelta = new Vector2(40f, 40f);
-        bgGo.GetComponent<Image>().color = Color.white;
-
-        GameObject checkGo = EnsureChild(bgGo, "Checkmark", typeof(Image));
-        EnsureRect(checkGo, Vector2.zero, Vector2.one);
-        checkGo.GetComponent<Image>().color = new Color(0.3f, 0.6f, 0.9f);
-
-        GameObject labelGo = EnsureChild(go, "Label", typeof(Text));
-        var labelRect = labelGo.GetComponent<RectTransform>();
-        labelRect.anchorMin = new Vector2(0f, 0f);
-        labelRect.anchorMax = new Vector2(1f, 1f);
-        labelRect.offsetMin = new Vector2(50f, 0f);
-        labelRect.offsetMax = Vector2.zero;
-        var labelText = labelGo.GetComponent<Text>();
+        var labelText = go.GetComponentInChildren<Text>();
         labelText.font = GetUiFont();
         labelText.text = label;
         labelText.color = Color.black;
-        labelText.alignment = TextAnchor.MiddleLeft;
 
-        var toggle = go.GetComponent<Toggle>();
-        toggle.targetGraphic = bgGo.GetComponent<Image>();
-        toggle.graphic = checkGo.GetComponent<Image>();
         return toggle;
+    }
+
+    private static Slider CreateLayoutSlider(GameObject parent, string name, float height)
+    {
+        GameObject go = CreateSliderRaw(parent, name);
+        return AddLayoutElement<Slider>(go, height);
     }
 
     private static void EnsureAppController(GameObject mochi, Text speechText, GameObject[] locationObjects, GameObject healthPanel, Button okButton)
@@ -661,32 +692,4 @@ public static class MochiSceneSetup
         so.ApplyModifiedPropertiesWithoutUndo();
     }
 
-    private static void EnsureSliderVisuals(GameObject sliderGo)
-    {
-        var slider = sliderGo.GetComponent<Slider>();
-        if (slider.fillRect != null && slider.handleRect != null) return;
-
-        GameObject bgGo = EnsureChild(sliderGo, "Background", typeof(Image));
-        EnsureRect(bgGo, Vector2.zero, Vector2.one);
-        bgGo.GetComponent<Image>().color = new Color(0.8f, 0.8f, 0.8f);
-
-        GameObject fillAreaGo = EnsureChild(sliderGo, "Fill Area", typeof(RectTransform));
-        EnsureRect(fillAreaGo, Vector2.zero, Vector2.one);
-
-        GameObject fillGo = EnsureChild(fillAreaGo, "Fill", typeof(Image));
-        EnsureRect(fillGo, Vector2.zero, Vector2.one);
-        fillGo.GetComponent<Image>().color = new Color(0.3f, 0.6f, 0.9f);
-
-        GameObject handleAreaGo = EnsureChild(sliderGo, "Handle Slide Area", typeof(RectTransform));
-        EnsureRect(handleAreaGo, Vector2.zero, Vector2.one);
-
-        GameObject handleGo = EnsureChild(handleAreaGo, "Handle", typeof(Image));
-        var handleRect = handleGo.GetComponent<RectTransform>();
-        handleRect.sizeDelta = new Vector2(30f, 0f);
-        handleGo.GetComponent<Image>().color = Color.white;
-
-        slider.targetGraphic = handleGo.GetComponent<Image>();
-        slider.fillRect = fillGo.GetComponent<RectTransform>();
-        slider.handleRect = handleGo.GetComponent<RectTransform>();
-    }
 }
