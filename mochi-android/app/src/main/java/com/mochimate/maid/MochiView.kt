@@ -68,6 +68,10 @@ class MochiView @JvmOverloads constructor(
 
     private var wobbleAnim: ValueAnimator? = null
 
+    /** 進む向きへの傾き(度)。止まっている時もゆらゆら揺れる分は自分で足す。 */
+    var tilt = 0f
+        set(value) { field = value; invalidate() }
+
     private val jumpAnim = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = 480
         interpolator = LinearInterpolator()
@@ -156,7 +160,7 @@ class MochiView @JvmOverloads constructor(
         val hop = sin(PI * jump).toFloat()          // 0→1→0
         // プカプカ: 0(いちばん下)〜1(いちばん上)をゆっくり行き来する
         val bob = (sin(2.0 * PI * floatPhase).toFloat() + 1f) / 2f
-        val lift = hop * h * 0.12f + bob * h * 0.06f
+        val lift = hop * h * 0.12f + bob * h * 0.07f
         // 浮いている時は少し縦長、下りてくると少しむにっ
         val breathe = 0.02f * cos(2.0 * PI * floatPhase).toFloat()
         var sx = 1f + breathe
@@ -175,6 +179,9 @@ class MochiView @JvmOverloads constructor(
         canvas.save()
         canvas.translate(0f, -lift - h * 0.03f)
         canvas.scale(sx, sy, cx, h * 0.62f)
+        // プカプカの周期とずらして、左右にもゆらゆら
+        val sway = 3.5f * sin(2.0 * PI * floatPhase * 0.5 + 0.8).toFloat()
+        canvas.rotate(tilt + sway, cx, h * 0.62f)
 
         // からだ
         val left = w * 0.1f

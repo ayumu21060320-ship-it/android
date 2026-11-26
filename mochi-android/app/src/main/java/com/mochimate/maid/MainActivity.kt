@@ -60,6 +60,7 @@ class MainActivity : Activity() {
             weatherBox.visibility = if (it) View.VISIBLE else View.GONE
         }
         setupCitySearch()
+        bindCheck(R.id.drift, prefs.driftEnabled) { prefs.driftEnabled = it }
         bindCheck(R.id.careCalorie, prefs.careCalorie) { prefs.careCalorie = it }
         bindCheck(R.id.careMoney, prefs.careMoney) { prefs.careMoney = it }
 

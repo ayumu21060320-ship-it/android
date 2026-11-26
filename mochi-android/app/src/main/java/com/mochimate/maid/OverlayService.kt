@@ -158,6 +158,8 @@ class OverlayService : Service() {
         bubble = BubbleView(this)
         bubbleParams = baseParams(touchable = false)
 
+        if (prefs.driftEnabled) handler.postDelayed({ if (mochi != null) startFling(0f, 0f) }, 1500)
+
         // 登場のあいさつ。天気のお世話を選んでいれば、続けて今日の天気も伝える。
         handler.postDelayed({ talk(MochiLines.greeting(prefs.masterName)) }, 400)
         if (prefs.careWeather) {
@@ -225,19 +227,19 @@ class OverlayService : Service() {
                         val vx = t?.xVelocity ?: 0f
                         val vy = t?.yVelocity ?: 0f
                         val d = resources.displayMetrics.density
-                        if (hypot(vx, vy) > 400 * d) {
-                            startFling(vx, vy)
-                        } else {
-                            prefs.overlayX = mochiParams.x
-                            prefs.overlayY = mochiParams.y
-                        }
+                        prefs.overlayX = mochiParams.x
+                        prefs.overlayY = mochiParams.y
+                        if (hypot(vx, vy) > 400 * d) startFling(vx, vy)
                     } else if (!longPressed) {
                         onTapped()
                     }
+                    // 手をはなしたら、また勝手にふわふわし始める
+                    if (!moving && prefs.driftEnabled) startFling(0f, 0f)
                     tracker?.recycle(); tracker = null
                 }
                 MotionEvent.ACTION_CANCEL -> {
                     handler.removeCallbacks(longPress)
+                    if (prefs.driftEnabled) startFling(0f, 0f)
                     tracker?.recycle(); tracker = null
                 }
             }
@@ -266,79 +268,130 @@ class OverlayService : Service() {
         )
     }
 
-    private var flingVX = 0f
-    private var flingVY = 0f
-    private var flingX = 0f
-    private var flingY = 0f
+    // 動きの状態。ぶん投げも、勝手にふわふわ漂うのも、同じ「動きのループ」で計算する。
+    private var vx = 0f
+    private var vy = 0f
+    private var px = 0f
+    private var py = 0f
+    private var targetVX = 0f   // ふわふわ漂う時に目指す速さ
+    private var targetVY = 0f
+    private var resting = true  // true の間はその場でプカプカ休憩
+    private var nextMoodAt = 0L // 次に「漂う/休む」を切り替える時刻
     private var lastFrameNanos = 0L
-    private var flinging = false
+    private var moving = false
     private var lastOuchAt = 0L
+    private var tilt = 0f
 
-    private val flingFrame = object : Choreographer.FrameCallback {
+    private val dp get() = resources.displayMetrics.density
+
+    private val motionFrame = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
             val m = mochi ?: return
-            if (!flinging) return
+            if (!moving) return
             val dt = if (lastFrameNanos == 0L) 1f / 60f
             else ((frameTimeNanos - lastFrameNanos) / 1e9f).coerceIn(0.001f, 0.05f)
             lastFrameNanos = frameTimeNanos
 
-            val d = resources.displayMetrics.density
+            val drift = prefs.driftEnabled
+            if (drift) updateMood()
+            else { targetVX = 0f; targetVY = 0f }
+
+            // 速さを目指す速さに少しずつ近づける。
+            // 投げられて速い時は空気でじわっと減速、ふだんはふんわり向きを変える。
+            val speed = hypot(vx, vy)
+            val rate = if (speed > 120 * dp) FRICTION else 0.7f
+            val k = 1f - exp(-rate * dt)
+            vx += (targetVX - vx) * k
+            vy += (targetVY - vy) * k
+
+            px += vx * dt
+            py += vy * dt
+
+            // 壁にぶつかったら跳ね返る。漂っている時は、目指す向きも壁の反対にする。
             val b = bounds()
-
-            flingX += flingVX * dt
-            flingY += flingVY * dt
-
-            // 壁にぶつかったら跳ね返る(少しずつ勢いがなくなる)
             var hitH = 0f
             var hitV = 0f
-            if (flingX < b.minX) { flingX = b.minX.toFloat(); hitH = abs(flingVX); flingVX = abs(flingVX) * RESTITUTION }
-            if (flingX > b.maxX) { flingX = b.maxX.toFloat(); hitH = abs(flingVX); flingVX = -abs(flingVX) * RESTITUTION }
-            if (flingY < b.minY) { flingY = b.minY.toFloat(); hitV = abs(flingVY); flingVY = abs(flingVY) * RESTITUTION }
-            if (flingY > b.maxY) { flingY = b.maxY.toFloat(); hitV = abs(flingVY); flingVY = -abs(flingVY) * RESTITUTION }
+            if (px < b.minX) { px = b.minX.toFloat(); hitH = abs(vx); vx = abs(vx) * RESTITUTION; targetVX = abs(targetVX) }
+            if (px > b.maxX) { px = b.maxX.toFloat(); hitH = abs(vx); vx = -abs(vx) * RESTITUTION; targetVX = -abs(targetVX) }
+            if (py < b.minY) { py = b.minY.toFloat(); hitV = abs(vy); vy = abs(vy) * RESTITUTION; targetVY = abs(targetVY) }
+            if (py > b.maxY) { py = b.maxY.toFloat(); hitV = abs(vy); vy = -abs(vy) * RESTITUTION; targetVY = -abs(targetVY) }
             val hit = maxOf(hitH, hitV)
-            if (hit > 150 * d) {
-                val strength = hit / (2500 * d)
+            if (hit > 150 * dp) {
+                val strength = hit / (2500 * dp)
                 m.bump(horizontal = hitH >= hitV, strength = strength)
                 val now = System.currentTimeMillis()
                 if (strength > 0.6f && now - lastOuchAt > 2500 && Random.nextInt(3) == 0) {
                     lastOuchAt = now
                     talk(MochiLines.ouch(prefs.masterName))
                 }
+            } else if (hit > 10 * dp) {
+                m.bump(horizontal = hitH >= hitV, strength = 0.12f) // ふわっと当たった時も少しだけむにっ
             }
 
-            // 空気でだんだん止まる
-            val friction = exp(-FRICTION * dt)
-            flingVX *= friction
-            flingVY *= friction
+            // 進む向きに少し傾く
+            val wantTilt = (vx / (60 * dp) * 6f).coerceIn(-14f, 14f)
+            tilt += (wantTilt - tilt) * (1f - exp(-5f * dt))
+            m.tilt = tilt
 
-            mochiParams.x = flingX.toInt()
-            mochiParams.y = flingY.toInt()
-            wm.updateViewLayout(m, mochiParams)
-            if (bubbleShown) positionBubble()
+            val nx = px.toInt()
+            val ny = py.toInt()
+            if (nx != mochiParams.x || ny != mochiParams.y) {
+                mochiParams.x = nx
+                mochiParams.y = ny
+                wm.updateViewLayout(m, mochiParams)
+                if (bubbleShown) positionBubble()
+            }
 
-            if (hypot(flingVX, flingVY) < 40 * d) stopFling(save = true)
+            // 勝手に動かない設定で、投げた勢いもなくなったら止める
+            if (!drift && hypot(vx, vy) < 30 * dp) stopFling(save = true)
             else Choreographer.getInstance().postFrameCallback(this)
         }
     }
 
-    private fun startFling(vx: Float, vy: Float) {
-        val d = resources.displayMetrics.density
-        val max = 7000 * d
-        val speed = hypot(vx, vy)
-        val k = if (speed > max) max / speed else 1f
-        flingVX = vx * k
-        flingVY = vy * k
-        flingX = mochiParams.x.toFloat()
-        flingY = mochiParams.y.toFloat()
-        lastFrameNanos = 0L
-        flinging = true
-        Choreographer.getInstance().postFrameCallback(flingFrame)
+    /** ときどき「ふわふわ漂う」と「その場で休む」を切り替える */
+    private fun updateMood() {
+        val now = System.currentTimeMillis()
+        if (now < nextMoodAt) return
+        resting = if (resting) false else Random.nextInt(3) == 0
+        if (resting) {
+            targetVX = 0f; targetVY = 0f
+            nextMoodAt = now + 4000 + Random.nextLong(6000)
+            prefs.overlayX = mochiParams.x
+            prefs.overlayY = mochiParams.y
+        } else {
+            // ゆっくり、好きな方向へ。上下より左右に流れやすくして、風船っぽく。
+            val angle = Random.nextDouble(0.0, 2 * Math.PI)
+            val sp = (18 + Random.nextInt(28)) * dp
+            targetVX = (kotlin.math.cos(angle) * sp).toFloat()
+            targetVY = (kotlin.math.sin(angle) * sp * 0.6f).toFloat()
+            nextMoodAt = now + 3000 + Random.nextLong(5000)
+        }
     }
 
+    /** 動きのループを始める(投げた時はその勢いから) */
+    private fun startFling(vx0: Float, vy0: Float) {
+        val max = 7000 * dp
+        val speed = hypot(vx0, vy0)
+        val k = if (speed > max) max / speed else 1f
+        vx = vx0 * k
+        vy = vy0 * k
+        px = mochiParams.x.toFloat()
+        py = mochiParams.y.toFloat()
+        // 投げられた直後は少しのあいだ漂い続ける
+        resting = true
+        nextMoodAt = System.currentTimeMillis() + if (speed > 0f) 1500 else 2500
+        lastFrameNanos = 0L
+        if (!moving) {
+            moving = true
+            Choreographer.getInstance().postFrameCallback(motionFrame)
+        }
+    }
+
+    /** 動きのループを止める(つかんだ時・おやすみの時) */
     private fun stopFling(save: Boolean) {
-        if (!flinging) return
-        flinging = false
-        Choreographer.getInstance().removeFrameCallback(flingFrame)
+        if (!moving) return
+        moving = false
+        Choreographer.getInstance().removeFrameCallback(motionFrame)
         if (save) {
             prefs.overlayX = mochiParams.x
             prefs.overlayY = mochiParams.y

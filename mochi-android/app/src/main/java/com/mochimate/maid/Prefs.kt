@@ -22,6 +22,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("care_money", false)
         set(value) = sp.edit().putBoolean("care_money", value).apply()
 
+    /** 勝手にふわふわ動き回るか */
+    var driftEnabled: Boolean
+        get() = sp.getBoolean("drift", true)
+        set(value) = sp.edit().putBoolean("drift", value).apply()
+
     /** 天気を調べる街。未設定なら null。 */
     val cityName: String? get() = sp.getString("city_name", null)
     val cityLat: Double? get() = sp.getString("city_lat", null)?.toDoubleOrNull()
