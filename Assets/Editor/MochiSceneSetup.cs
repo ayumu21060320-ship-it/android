@@ -1,4 +1,5 @@
-﻿using UnityEditor;
+﻿using System.IO;
+using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -59,7 +60,7 @@ public static class MochiSceneSetup
         GameObject[] limbTransforms = EnsureLimbs(mochi, mochiMat);
         AttachScripts(mochi, face, limbTransforms);
 
-        Text speechText = EnsureSpeechCanvas();
+        Text speechText = EnsureSpeechCanvas(mochi.transform, cam);
         WeatherService weatherService = EnsureWeatherComponents(mochi, speechText);
         GameObject[] locationObjects = EnsureLocationUI(weatherService);
         GameObject healthPanel = EnsureHealthPanel();
@@ -339,7 +340,7 @@ public static class MochiSceneSetup
         bodySo.ApplyModifiedPropertiesWithoutUndo();
     }
 
-    private static Text EnsureSpeechCanvas()
+    private static Text EnsureSpeechCanvas(Transform mochiTransform, Camera worldCamera)
     {
         GameObject canvasGo = GameObject.Find("SpeechCanvas");
         Canvas canvas;
@@ -360,29 +361,47 @@ public static class MochiSceneSetup
             canvas = canvasGo.GetComponent<Canvas>();
         }
 
-        Transform existingText = canvasGo.transform.Find("SpeechText");
-        GameObject textGo;
+        EnsureSpeechBubbleSprites(out Sprite bubbleSprite, out Sprite tailSprite);
 
-        if (existingText == null)
-        {
-            textGo = new GameObject("SpeechText", typeof(Text));
-            textGo.transform.SetParent(canvasGo.transform, false);
-            Undo.RegisterCreatedObjectUndo(textGo, "Create SpeechText");
-        }
-        else
-        {
-            textGo = existingText.gameObject;
-        }
+        // 吹き出し本体(角丸の背景 + 中のテキスト)
+        GameObject bubbleGo = EnsureChild(canvasGo, "SpeechBubble", typeof(Image));
+        var bubbleRect = bubbleGo.GetComponent<RectTransform>();
+        bubbleRect.anchorMin = new Vector2(0.5f, 0.5f);
+        bubbleRect.anchorMax = new Vector2(0.5f, 0.5f);
+        bubbleRect.pivot = new Vector2(0.5f, 0f);
+        bubbleRect.sizeDelta = new Vector2(620f, 260f);
 
-        var rect = textGo.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.1f, 0.75f);
-        rect.anchorMax = new Vector2(0.9f, 0.9f);
-        rect.offsetMin = Vector2.zero;
-        rect.offsetMax = Vector2.zero;
+        var bubbleImage = bubbleGo.GetComponent<Image>();
+        bubbleImage.sprite = bubbleSprite;
+        bubbleImage.type = Image.Type.Sliced;
+        bubbleImage.color = Color.white;
+
+        // しっぽ(吹き出しの下端、Mochiを指す側)
+        GameObject tailGo = EnsureChild(bubbleGo, "Tail", typeof(Image));
+        var tailRect = tailGo.GetComponent<RectTransform>();
+        tailRect.anchorMin = new Vector2(0.5f, 0f);
+        tailRect.anchorMax = new Vector2(0.5f, 0f);
+        tailRect.pivot = new Vector2(0.5f, 1f);
+        tailRect.anchoredPosition = Vector2.zero;
+        tailRect.sizeDelta = new Vector2(60f, 46f);
+        tailGo.GetComponent<Image>().sprite = tailSprite;
+
+        // テキスト本体
+        GameObject textGo = EnsureChild(bubbleGo, "SpeechText", typeof(Text));
+        var textRect = textGo.GetComponent<RectTransform>();
+        textRect.anchorMin = new Vector2(0f, 0f);
+        textRect.anchorMax = new Vector2(1f, 1f);
+        textRect.offsetMin = new Vector2(30f, 40f);
+        textRect.offsetMax = new Vector2(-30f, -30f);
 
         var text = textGo.GetComponent<Text>();
         text.font = GetUiFont();
-        text.fontSize = 48;
+        text.fontSize = 40;
+        text.resizeTextForBestFit = true;
+        text.resizeTextMinSize = 20;
+        text.resizeTextMaxSize = 40;
+        text.horizontalOverflow = HorizontalWrapMode.Wrap;
+        text.verticalOverflow = VerticalWrapMode.Overflow;
         text.alignment = TextAnchor.MiddleCenter;
         text.color = Color.black;
         if (string.IsNullOrEmpty(text.text))
@@ -390,7 +409,148 @@ public static class MochiSceneSetup
             text.text = "天気を取得中...";
         }
 
+        var followScript = bubbleGo.GetComponent<MochiSpeechBubble>();
+        if (followScript == null) followScript = bubbleGo.AddComponent<MochiSpeechBubble>();
+
+        var so = new SerializedObject(followScript);
+        so.FindProperty("target").objectReferenceValue = mochiTransform;
+        so.FindProperty("worldCamera").objectReferenceValue = worldCamera;
+        so.ApplyModifiedPropertiesWithoutUndo();
+
         return text;
+    }
+
+    // 吹き出し(角丸パネル・しっぽ)の画像を初回だけ生成して保存します。
+    private static void EnsureSpeechBubbleSprites(out Sprite bubbleSprite, out Sprite tailSprite)
+    {
+        const string dir = "Assets/Sprites";
+        const string bubblePath = dir + "/SpeechBubble.png";
+        const string tailPath = dir + "/SpeechBubbleTail.png";
+
+        if (!AssetDatabase.IsValidFolder(dir))
+        {
+            AssetDatabase.CreateFolder("Assets", "Sprites");
+        }
+
+        bubbleSprite = LoadOrCreateSprite(bubblePath, () =>
+        {
+            const int size = 128;
+            const int radius = 28;
+            const int border = 6;
+            return CreateRoundedRectTexture(size, size, radius, new Color32(50, 50, 50, 255), Color.white, border);
+        }, new Vector4(28, 28, 28, 28));
+
+        tailSprite = LoadOrCreateSprite(tailPath, () =>
+            CreateTriangleTexture(56, 46, new Color32(50, 50, 50, 255), Color.white, 6),
+            Vector4.zero);
+    }
+
+    private static Sprite LoadOrCreateSprite(string path, System.Func<Texture2D> createTexture, Vector4 border)
+    {
+        Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        if (sprite != null) return sprite;
+
+        Texture2D tex = createTexture();
+        File.WriteAllBytes(path, tex.EncodeToPNG());
+        Object.DestroyImmediate(tex);
+        AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+
+        var importer = (TextureImporter)AssetImporter.GetAtPath(path);
+        importer.textureType = TextureImporterType.Sprite;
+        importer.spriteBorder = border;
+        importer.filterMode = FilterMode.Bilinear;
+        importer.mipmapEnabled = false;
+        importer.alphaIsTransparency = true;
+        importer.SaveAndReimport();
+
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
+    private static Texture2D CreateRoundedRectTexture(int width, int height, int radius, Color32 borderColor, Color32 fillColor, int borderWidth)
+    {
+        var tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        var pixels = new Color32[width * height];
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                if (IsInsideRoundedRect(x, y, width, height, radius, 0))
+                {
+                    bool insideInner = IsInsideRoundedRect(x, y, width, height, Mathf.Max(0, radius - borderWidth), borderWidth);
+                    pixels[y * width + x] = insideInner ? fillColor : borderColor;
+                }
+                else
+                {
+                    pixels[y * width + x] = new Color32(0, 0, 0, 0);
+                }
+            }
+        }
+
+        tex.SetPixels32(pixels);
+        tex.Apply();
+        return tex;
+    }
+
+    private static bool IsInsideRoundedRect(int x, int y, int width, int height, int radius, int inset)
+    {
+        int left = inset;
+        int top = inset;
+        int w = width - inset * 2;
+        int h = height - inset * 2;
+        int localX = x - left;
+        int localY = y - top;
+
+        if (localX < 0 || localX >= w || localY < 0 || localY >= h) return false;
+
+        bool nearLeft = localX < radius;
+        bool nearRight = localX >= w - radius;
+        bool nearTop = localY < radius;
+        bool nearBottom = localY >= h - radius;
+
+        if ((nearLeft || nearRight) && (nearTop || nearBottom))
+        {
+            int cx = nearLeft ? radius : w - radius - 1;
+            int cy = nearTop ? radius : h - radius - 1;
+            float dx = localX - cx;
+            float dy = localY - cy;
+            return (dx * dx + dy * dy) <= radius * (float)radius;
+        }
+
+        return true;
+    }
+
+    private static Texture2D CreateTriangleTexture(int width, int height, Color32 borderColor, Color32 fillColor, int borderWidth)
+    {
+        var tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        var pixels = new Color32[width * height];
+
+        for (int i = 0; i < pixels.Length; i++)
+        {
+            pixels[i] = new Color32(0, 0, 0, 0);
+        }
+
+        // 上辺が広く、下に向かって狭まる(下向き)三角形
+        for (int y = 0; y < height; y++)
+        {
+            float t = (float)y / (height - 1);
+            float halfWidthAtY = (width / 2f) * (1f - t);
+            int center = width / 2;
+            int xMin = Mathf.RoundToInt(center - halfWidthAtY);
+            int xMax = Mathf.RoundToInt(center + halfWidthAtY);
+
+            for (int x = xMin; x <= xMax; x++)
+            {
+                if (x < 0 || x >= width) continue;
+
+                bool isBorder = x <= xMin + borderWidth || x >= xMax - borderWidth || y < borderWidth;
+                pixels[y * width + x] = isBorder ? borderColor : fillColor;
+            }
+        }
+
+        tex.SetPixels32(pixels);
+        tex.Apply();
+        return tex;
     }
 
     private static WeatherService EnsureWeatherComponents(GameObject mochi, Text speechText)
@@ -771,9 +931,13 @@ public static class MochiSceneSetup
         so.FindProperty("mochiBody").objectReferenceValue = mochi.GetComponent<MochiBody>();
         so.FindProperty("speechText").objectReferenceValue = speechText;
 
+        GameObject speechBubble = speechText != null && speechText.transform.parent != null
+            ? speechText.transform.parent.gameObject
+            : (speechText != null ? speechText.gameObject : null);
+
         var activeOnlyProp = so.FindProperty("activeOnlyObjects");
         activeOnlyProp.arraySize = 1;
-        activeOnlyProp.GetArrayElementAtIndex(0).objectReferenceValue = speechText != null ? speechText.gameObject : null;
+        activeOnlyProp.GetArrayElementAtIndex(0).objectReferenceValue = speechBubble;
 
         so.ApplyModifiedPropertiesWithoutUndo();
     }
