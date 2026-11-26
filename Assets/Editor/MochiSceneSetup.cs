@@ -2,6 +2,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 // Unityエディタのメニュー「Mochi > Setup Scene」から実行する、
 // Mochiキャラのシーン構成(カメラ設定・本体・顔・スクリプトのアタッチ)を自動で行うツールです。
@@ -18,6 +19,9 @@ public static class MochiSceneSetup
         EnsureVisor(mochi);
         GameObject[] limbTransforms = EnsureLimbs(mochi, mochiMat);
         AttachScripts(mochi, face, limbTransforms);
+
+        Text speechText = EnsureSpeechCanvas();
+        EnsureWeatherComponents(mochi, speechText);
 
         Selection.activeGameObject = mochi;
         EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
@@ -236,5 +240,90 @@ public static class MochiSceneSetup
             limbsFieldProp.objectReferenceValue = limbsScript;
         }
         bodySo.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    private static Text EnsureSpeechCanvas()
+    {
+        GameObject canvasGo = GameObject.Find("SpeechCanvas");
+        Canvas canvas;
+
+        if (canvasGo == null)
+        {
+            canvasGo = new GameObject("SpeechCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            Undo.RegisterCreatedObjectUndo(canvasGo, "Create SpeechCanvas");
+            canvas = canvasGo.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+
+            var scaler = canvasGo.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1080f, 1920f);
+        }
+        else
+        {
+            canvas = canvasGo.GetComponent<Canvas>();
+        }
+
+        Transform existingText = canvasGo.transform.Find("SpeechText");
+        GameObject textGo;
+
+        if (existingText == null)
+        {
+            textGo = new GameObject("SpeechText", typeof(Text));
+            textGo.transform.SetParent(canvasGo.transform, false);
+            Undo.RegisterCreatedObjectUndo(textGo, "Create SpeechText");
+        }
+        else
+        {
+            textGo = existingText.gameObject;
+        }
+
+        var rect = textGo.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.1f, 0.75f);
+        rect.anchorMax = new Vector2(0.9f, 0.9f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+
+        var text = textGo.GetComponent<Text>();
+        text.font = (Font)AssetDatabase.GetBuiltinExtraResource<Font>("Arial.ttf");
+        text.fontSize = 48;
+        text.alignment = TextAnchor.MiddleCenter;
+        text.color = Color.black;
+        if (string.IsNullOrEmpty(text.text))
+        {
+            text.text = "天気を取得中...";
+        }
+
+        return text;
+    }
+
+    private static void EnsureWeatherComponents(GameObject mochi, Text speechText)
+    {
+        var weatherService = mochi.GetComponent<WeatherService>();
+        if (weatherService == null) weatherService = mochi.AddComponent<WeatherService>();
+
+        var weatherDisplay = mochi.GetComponent<MochiWeatherDisplay>();
+        if (weatherDisplay == null) weatherDisplay = mochi.AddComponent<MochiWeatherDisplay>();
+
+        var displaySo = new SerializedObject(weatherDisplay);
+
+        var serviceProp = displaySo.FindProperty("weatherService");
+        if (serviceProp.objectReferenceValue == null)
+        {
+            serviceProp.objectReferenceValue = weatherService;
+        }
+
+        var rendererProp = displaySo.FindProperty("mochiRenderer");
+        if (rendererProp.objectReferenceValue == null)
+        {
+            rendererProp.objectReferenceValue = mochi.GetComponent<Renderer>();
+        }
+
+        var speechProp = displaySo.FindProperty("speechText");
+        if (speechProp.objectReferenceValue == null)
+        {
+            speechProp.objectReferenceValue = speechText;
+        }
+
+        displaySo.ApplyModifiedPropertiesWithoutUndo();
     }
 }
