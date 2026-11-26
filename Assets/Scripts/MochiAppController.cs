@@ -5,7 +5,8 @@ using UnityEngine.UI;
 // 1. 起動直後は「何をお世話してほしいか」を選ぶ画面だけ表示(天気・健康管理など)
 // 2. 選んだ項目の入力欄だけが表示される
 // 3. 下部の「はじめる」ボタンを押すとキャラが登場し、以後はこれらの画面は隠れる
-// 4. キャラをダブルタップすると、選んだ項目の入力欄をまた開ける
+// 4. キャラをダブルタップすると、カテゴリー選択画面ごと再び開く。
+//    ここでチェックを付け外しして「つぎへ」を押せば、項目の追加・削除も後からできる。
 public class MochiAppController : MonoBehaviour
 {
     [Header("お世話カテゴリーを選ぶ画面(最初に出る)")]
@@ -129,10 +130,24 @@ public class MochiAppController : MonoBehaviour
 
     private void OnMochiDoubleTapped()
     {
-        bool currentlyVisible = okBarRoot != null && okBarRoot.activeSelf;
+        bool currentlyOpen = okBarRoot != null && okBarRoot.activeSelf;
 
-        ApplyCategoryVisibility(!currentlyVisible);
-        SetActive(okBarRoot, !currentlyVisible);
+        if (currentlyOpen)
+        {
+            SetActive(categoryPanel, false);
+            ApplyCategoryVisibility(false);
+            SetActive(okBarRoot, false);
+        }
+        else
+        {
+            // 今選んでいる項目を反映した状態で、カテゴリー選択からやり直せるようにする
+            if (wantWeatherToggle != null) wantWeatherToggle.isOn = wantWeather;
+            if (wantHealthToggle != null) wantHealthToggle.isOn = wantHealth;
+
+            SetActive(categoryPanel, true);
+            ApplyCategoryVisibility(true);
+            SetActive(okBarRoot, true);
+        }
     }
 
     private void ApplyCategoryVisibility(bool visible)
