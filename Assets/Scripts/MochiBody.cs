@@ -14,27 +14,24 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
     [Tooltip("手足を管理しているMochiLimbs。未設定なら自動で同じGameObjectから探します。")]
     [SerializeField] private MochiLimbs limbs;
 
-    [Header("スワイプで吹っ飛ぶ設定")]
+    [Header("スワイプで吹っ飛ぶ設定(エアホッケー風)")]
     [Tooltip("スワイプの速さに対して、どれくらい勢いよく飛ばすか")]
-    [SerializeField] private float launchSpeedMultiplier = 1f;
+    [SerializeField] private float launchSpeedMultiplier = 0.8f;
 
     [Tooltip("飛んでいく最大の速さ")]
-    [SerializeField] private float maxLaunchSpeed = 8f;
+    [SerializeField] private float maxLaunchSpeed = 5f;
 
-    [Tooltip("飛んでいる間、1秒あたりどれくらい減速するか")]
-    [SerializeField] private float flightDamping = 1.2f;
+    [Tooltip("飛んでいる間、1秒あたりどれくらい減速するか(エアホッケーらしく、小さめの値で滑らせる)")]
+    [SerializeField] private float flightDamping = 0.4f;
 
     [Tooltip("これより遅くなったら飛ぶのをやめて、浮遊に戻る")]
     [SerializeField] private float minFlightSpeed = 0.1f;
 
-    [Tooltip("画面内に収めるための移動範囲(左下)")]
-    [SerializeField] private Vector2 boundsMin = new Vector2(-3f, -4f);
+    [Tooltip("カメラに映る画面の端から、どれくらい手前で跳ね返るか")]
+    [SerializeField] private float edgeMargin = 0.5f;
 
-    [Tooltip("画面内に収めるための移動範囲(右上)")]
-    [SerializeField] private Vector2 boundsMax = new Vector2(3f, 4f);
-
-    [Tooltip("端で跳ね返った時に、どれくらい勢いが残るか(1で跳ね返り後も同じ速さ)")]
-    [SerializeField, Range(0f, 1f)] private float bounceDamping = 0.6f;
+    [Tooltip("端で跳ね返った時に、どれくらい勢いが残るか(1に近いほどよく弾む)")]
+    [SerializeField, Range(0f, 1f)] private float bounceDamping = 0.85f;
 
     [Header("無重力でふわふわ漂う設定")]
     [Tooltip("上下に漂う高さ")]
@@ -79,6 +76,10 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
     private bool isFlying;
     private Vector3 flightVelocity;
 
+    private Camera viewCamera;
+    private Vector2 boundsMin;
+    private Vector2 boundsMax;
+
     private void Awake()
     {
         baseScale = transform.localScale;
@@ -95,6 +96,21 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
         {
             limbs = GetComponent<MochiLimbs>();
         }
+
+        viewCamera = Camera.main;
+        RecalculateScreenBounds();
+    }
+
+    private void RecalculateScreenBounds()
+    {
+        if (viewCamera == null) return;
+
+        float depth = Mathf.Abs(transform.position.z - viewCamera.transform.position.z);
+        Vector3 bottomLeft = viewCamera.ViewportToWorldPoint(new Vector3(0f, 0f, depth));
+        Vector3 topRight = viewCamera.ViewportToWorldPoint(new Vector3(1f, 1f, depth));
+
+        boundsMin = new Vector2(bottomLeft.x + edgeMargin, bottomLeft.y + edgeMargin);
+        boundsMax = new Vector2(topRight.x - edgeMargin, topRight.y - edgeMargin);
     }
 
     public void OnPointerDown(PointerEventData eventData)
@@ -220,6 +236,8 @@ public class MochiBody : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, 
 
     private void UpdateFlight()
     {
+        RecalculateScreenBounds();
+
         Vector3 position = transform.position + flightVelocity * Time.deltaTime;
 
         // 空気抵抗はないはずだが、画面内に留まるようゆっくり減速させる

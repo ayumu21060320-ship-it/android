@@ -13,6 +13,10 @@
 /[Bb]uilds/
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
+
+# Googleの依存関係解決ツール(未使用のため、自動生成されても追跡しない)
+/Assets/MobileDependencyResolver/
+/Assets/Resources/BillingMode.json*
 *.log
 
 # Memory Profiler generated files
