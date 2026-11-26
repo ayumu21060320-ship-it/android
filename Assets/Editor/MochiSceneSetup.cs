@@ -361,6 +361,13 @@ public static class MochiSceneSetup
             canvas = canvasGo.GetComponent<Canvas>();
         }
 
+        // 吹き出し導入前の古いSpeechText(SpeechCanvasの直接の子)が残っていたら片付ける
+        Transform staleText = canvasGo.transform.Find("SpeechText");
+        if (staleText != null)
+        {
+            Undo.DestroyObjectImmediate(staleText.gameObject);
+        }
+
         EnsureSpeechBubbleSprites(out Sprite bubbleSprite, out Sprite tailSprite);
 
         // 吹き出し本体(角丸の背景 + 中のテキスト)
