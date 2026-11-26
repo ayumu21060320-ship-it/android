@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- アプリのアイコンを長押しした時に出るメニュー -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="record_food"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_food">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.mochimate.maid"
+            android:targetClass="com.mochimate.maid.CalorieActivity" />
+    </shortcut>
+</shortcuts>

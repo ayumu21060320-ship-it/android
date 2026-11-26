@@ -105,7 +105,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="カロリーと家計簿は順番に使えるようになります"
+                android:text="家計簿はもうすぐ使えるようになります"
                 android:textColor="@color/ink_sub"
                 android:textSize="13sp" />
 
@@ -175,9 +175,20 @@
                 android:id="@+id/careCalorie"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="🍙 カロリーを管理してほしい（準備中）"
+                android:text="🍙 カロリーを管理してほしい"
                 android:textColor="@color/ink"
                 android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/openCalorie"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginStart="32dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/button_sub_bg"
+                android:text="ごはんを記録する"
+                android:textColor="@color/accent"
+                android:textStyle="bold" />
 
             <CheckBox
                 android:id="@+id/careMoney"

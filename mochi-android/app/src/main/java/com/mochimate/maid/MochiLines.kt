@@ -60,7 +60,6 @@ object MochiLines {
     /** まだ作っていないお世話を選んでいる時のセリフ */
     fun comingSoon(prefs: Prefs): String? {
         val list = buildList {
-            if (prefs.careCalorie) add("カロリー")
             if (prefs.careMoney) add("家計簿")
         }
         if (list.isEmpty()) return null

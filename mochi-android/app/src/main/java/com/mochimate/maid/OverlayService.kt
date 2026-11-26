@@ -101,11 +101,18 @@ class OverlayService : Service() {
             this, 1, Intent(this, OverlayService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
+        val food = PendingIntent.getActivity(
+            this, 2, Intent(this, CalorieActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
         val notification = Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("もちもちがおそばにいます")
             .setContentText("タップで設定を開きます")
             .setContentIntent(openApp)
+            .apply {
+                if (prefs.careCalorie) addAction(Notification.Action.Builder(null, "ごはんを記録", food).build())
+            }
             .addAction(Notification.Action.Builder(null, "おやすみさせる", stop).build())
             .setOngoing(true)
             .build()
@@ -163,7 +170,7 @@ class OverlayService : Service() {
         // 登場のあいさつ。天気のお世話を選んでいれば、続けて今日の天気も伝える。
         handler.postDelayed({ talk(MochiLines.greeting(prefs.masterName)) }, 400)
         if (prefs.careWeather) {
-            talkCount = 2 // 次のタップはふつうのおしゃべりから
+            talkCount = 2 // あいさつと天気は済んだので、次のタップはその続きから
             handler.postDelayed({ if (mochi != null) talkWeather() }, 4500)
         }
     }
@@ -402,9 +409,15 @@ class OverlayService : Service() {
         mochi?.react()
         val name = prefs.masterName
         talkCount++
+        // あいさつ → (天気) → (カロリー) → ふつうのおしゃべり、の順にくり返す
+        val topics = buildList<() -> Unit> {
+            add { talk(MochiLines.greeting(name)) }
+            if (prefs.careWeather) add { talkWeather() }
+            if (prefs.careCalorie) add { talk(CalorieStore(this@OverlayService).line(name)) }
+        }
+        val i = (talkCount - 1) % (topics.size + 1)
         when {
-            talkCount % 3 == 1 -> talk(MochiLines.greeting(name))
-            talkCount % 3 == 2 && prefs.careWeather -> talkWeather()
+            i < topics.size -> topics[i]()
             Random.nextInt(4) == 0 -> talk(MochiLines.comingSoon(prefs) ?: MochiLines.random(name))
             else -> talk(MochiLines.random(name))
         }

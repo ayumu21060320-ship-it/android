@@ -61,7 +61,13 @@ class MainActivity : Activity() {
         }
         setupCitySearch()
         bindCheck(R.id.drift, prefs.driftEnabled) { prefs.driftEnabled = it }
-        bindCheck(R.id.careCalorie, prefs.careCalorie) { prefs.careCalorie = it }
+        val openCalorie = findViewById<Button>(R.id.openCalorie)
+        openCalorie.visibility = if (prefs.careCalorie) View.VISIBLE else View.GONE
+        openCalorie.setOnClickListener { startActivity(Intent(this, CalorieActivity::class.java)) }
+        bindCheck(R.id.careCalorie, prefs.careCalorie) {
+            prefs.careCalorie = it
+            openCalorie.visibility = if (it) View.VISIBLE else View.GONE
+        }
         bindCheck(R.id.careMoney, prefs.careMoney) { prefs.careMoney = it }
 
         findViewById<Button>(R.id.grant).setOnClickListener {
