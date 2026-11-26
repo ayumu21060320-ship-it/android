@@ -16,6 +16,7 @@
 
 # Googleの依存関係解決ツール(未使用のため、自動生成されても追跡しない)
 /Assets/MobileDependencyResolver/
+/Assets/MobileDependencyResolver.meta
 /Assets/Resources/BillingMode.json*
 *.log
 
