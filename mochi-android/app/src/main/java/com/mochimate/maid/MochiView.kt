@@ -11,6 +11,8 @@ import android.util.AttributeSet
 import android.view.View
 import android.view.animation.LinearInterpolator
 import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -47,17 +49,24 @@ class MochiView @JvmOverloads constructor(
     private val tmpRect = RectF()
     private val tmpPath = Path()
 
-    private var breath = 0f      // 0..1 呼吸
+    private var floatPhase = 0f  // 0..1 プカプカの周期
     private var jump = 0f        // 0..1 ジャンプ
     private var eyeOpen = 1f     // 1=開いてる 0=閉じてる
     private var happy = false    // ^ ^ の目
+    private var dizzy = false    // > < の目(壁に強くぶつかった時)
 
-    private val breathAnim = ValueAnimator.ofFloat(0f, 1f).apply {
-        duration = 1500
+    // 壁にぶつかった時の「むにっ」
+    private var wobble = 0f
+    private var wobbleHorizontal = true
+
+    private val floatAnim = ValueAnimator.ofFloat(0f, 1f).apply {
+        duration = 2600
         repeatCount = ValueAnimator.INFINITE
-        repeatMode = ValueAnimator.REVERSE
-        addUpdateListener { breath = it.animatedValue as Float; invalidate() }
+        interpolator = LinearInterpolator()
+        addUpdateListener { floatPhase = it.animatedValue as Float; invalidate() }
     }
+
+    private var wobbleAnim: ValueAnimator? = null
 
     private val jumpAnim = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = 480
@@ -77,6 +86,34 @@ class MochiView @JvmOverloads constructor(
     }
 
     private val endHappy = Runnable { happy = false; invalidate() }
+    private val endDizzy = Runnable { dizzy = false; invalidate() }
+
+    /**
+     * 壁にぶつかった時のリアクション。
+     * @param horizontal 左右の壁なら true、上下の壁なら false
+     * @param strength 0..1 ぶつかった強さ
+     */
+    fun bump(horizontal: Boolean, strength: Float) {
+        val st = strength.coerceIn(0f, 1f)
+        wobbleHorizontal = horizontal
+        wobbleAnim?.cancel()
+        wobbleAnim = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 550
+            interpolator = LinearInterpolator()
+            addUpdateListener {
+                val t = it.animatedValue as Float
+                // だんだん小さくなる、ぷるぷる
+                wobble = st * exp(-4.5f * t) * cos(3f * 2f * PI.toFloat() * t)
+                invalidate()
+            }
+            start()
+        }
+        if (st > 0.45f) {
+            dizzy = true
+            removeCallbacks(endDizzy)
+            postDelayed(endDizzy, 700)
+        }
+    }
 
     /** タップされた時のリアクション */
     fun react() {
@@ -89,13 +126,15 @@ class MochiView @JvmOverloads constructor(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        breathAnim.start()
+        floatAnim.start()
         postDelayed(blinkRunnable, 2000)
     }
 
     override fun onDetachedFromWindow() {
-        breathAnim.cancel()
+        floatAnim.cancel()
         jumpAnim.cancel()
+        wobbleAnim?.cancel()
+        removeCallbacks(endDizzy)
         removeCallbacks(blinkRunnable)
         removeCallbacks(endHappy)
         super.onDetachedFromWindow()
@@ -115,20 +154,27 @@ class MochiView @JvmOverloads constructor(
         val cx = w / 2f
 
         val hop = sin(PI * jump).toFloat()          // 0→1→0
-        val lift = hop * h * 0.14f
-        // 着地の前後で少しつぶれる。ふだんは呼吸でゆっくり伸び縮み。
-        val squish = 0.035f * breath
-        val sx = 1f + squish
-        val sy = 1f - squish
+        // プカプカ: 0(いちばん下)〜1(いちばん上)をゆっくり行き来する
+        val bob = (sin(2.0 * PI * floatPhase).toFloat() + 1f) / 2f
+        val lift = hop * h * 0.12f + bob * h * 0.06f
+        // 浮いている時は少し縦長、下りてくると少しむにっ
+        val breathe = 0.02f * cos(2.0 * PI * floatPhase).toFloat()
+        var sx = 1f + breathe
+        var sy = 1f - breathe
+        // 壁にぶつかった方向につぶれる
+        if (wobbleHorizontal) { sx -= wobble * 0.28f; sy += wobble * 0.22f }
+        else { sx += wobble * 0.22f; sy -= wobble * 0.28f }
 
-        // かげ(地面に残る)
-        val shW = w * 0.34f * (1f - hop * 0.35f)
-        tmpRect.set(cx - shW, h * 0.9f, cx + shW, h * 0.97f)
+        // かげ(高く浮くほど小さく薄く)
+        val height01 = (lift / (h * 0.18f)).coerceIn(0f, 1f)
+        val shW = w * 0.32f * (1f - height01 * 0.4f)
+        shadow.alpha = (0x33 * (1f - height01 * 0.5f)).toInt()
+        tmpRect.set(cx - shW, h * 0.91f, cx + shW, h * 0.97f)
         canvas.drawOval(tmpRect, shadow)
 
         canvas.save()
-        canvas.translate(0f, -lift)
-        canvas.scale(sx, sy, cx, h * 0.93f)
+        canvas.translate(0f, -lift - h * 0.03f)
+        canvas.scale(sx, sy, cx, h * 0.62f)
 
         // からだ
         val left = w * 0.1f
@@ -165,7 +211,18 @@ class MochiView @JvmOverloads constructor(
         // 目
         val eyeY = top + bh * 0.52f
         val eyeDX = bw * 0.17f
-        if (happy) {
+        if (dizzy) {
+            // > <
+            for (s in arrayOf(-1f, 1f)) {
+                val ex = cx + s * eyeDX
+                val d = bw * 0.05f
+                tmpPath.reset()
+                tmpPath.moveTo(ex - s * d, eyeY - d)
+                tmpPath.lineTo(ex + s * d, eyeY)
+                tmpPath.lineTo(ex - s * d, eyeY + d)
+                canvas.drawPath(tmpPath, line)
+            }
+        } else if (happy) {
             for (s in arrayOf(-1f, 1f)) {
                 val ex = cx + s * eyeDX
                 tmpPath.reset()

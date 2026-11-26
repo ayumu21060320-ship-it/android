@@ -45,6 +45,15 @@ object MochiLines {
         "肩の力、抜いていきましょ〜。",
     )
 
+    /** 壁に強くぶつかった時のセリフ */
+    fun ouch(name: String): String = pick(
+        "きゃっ！",
+        "わわっ、目がまわります〜！",
+        "いたた…${name}、らんぼうはダメですよ！",
+        "ぽよんっ！",
+        "もう〜、${name}ったら！",
+    )
+
     /** 長押しでアプリを開く時のセリフ */
     fun openSettings(name: String) = "設定を開きますね、${name}！"
 

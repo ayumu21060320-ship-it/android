@@ -17,10 +17,14 @@ import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.Choreographer
+import android.view.VelocityTracker
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
 import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.hypot
 import kotlin.random.Random
 
 /**
@@ -70,6 +74,7 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         isRunning = false
+        stopFling(save = true)
         handler.removeCallbacksAndMessages(null)
         bubble?.let { if (bubbleShown) runCatching { wm.removeView(it) } }
         mochi?.let { runCatching { wm.removeView(it) } }
@@ -169,20 +174,34 @@ class OverlayService : Service() {
         private var startY = 0
         private var dragging = false
         private var longPressed = false
+        private var tracker: VelocityTracker? = null
         private val longPress = Runnable {
             longPressed = true
             openSettings()
         }
 
+        /** ウィンドウ自体が動くので、画面全体の座標(raw)で速さを測る */
+        private fun track(e: MotionEvent) {
+            val copy = MotionEvent.obtain(e)
+            copy.setLocation(e.rawX, e.rawY)
+            tracker?.addMovement(copy)
+            copy.recycle()
+        }
+
         override fun onTouch(v: View, e: MotionEvent): Boolean {
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    stopFling(save = false) // 飛んでいる途中ならキャッチ
+                    tracker?.recycle()
+                    tracker = VelocityTracker.obtain()
+                    track(e)
                     downX = e.rawX; downY = e.rawY
                     startX = mochiParams.x; startY = mochiParams.y
                     dragging = false; longPressed = false
                     handler.postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong() + 200)
                 }
                 MotionEvent.ACTION_MOVE -> {
+                    track(e)
                     val dx = e.rawX - downX
                     val dy = e.rawY - downY
                     if (!dragging && (abs(dx) > slop || abs(dy) > slop)) {
@@ -190,9 +209,9 @@ class OverlayService : Service() {
                         handler.removeCallbacks(longPress)
                     }
                     if (dragging) {
-                        val (sw, sh) = screenSize()
-                        mochiParams.x = (startX + dx).toInt().coerceIn(0, (sw - v.width).coerceAtLeast(0))
-                        mochiParams.y = (startY + dy).toInt().coerceIn(0, (sh - v.height).coerceAtLeast(0))
+                        val b = bounds()
+                        mochiParams.x = (startX + dx).toInt().coerceIn(b.minX, b.maxX)
+                        mochiParams.y = (startY + dy).toInt().coerceIn(b.minY, b.maxY)
                         wm.updateViewLayout(v, mochiParams)
                         if (bubbleShown) positionBubble()
                     }
@@ -200,15 +219,129 @@ class OverlayService : Service() {
                 MotionEvent.ACTION_UP -> {
                     handler.removeCallbacks(longPress)
                     if (dragging) {
-                        prefs.overlayX = mochiParams.x
-                        prefs.overlayY = mochiParams.y
+                        val t = tracker
+                        track(e)
+                        t?.computeCurrentVelocity(1000)
+                        val vx = t?.xVelocity ?: 0f
+                        val vy = t?.yVelocity ?: 0f
+                        val d = resources.displayMetrics.density
+                        if (hypot(vx, vy) > 400 * d) {
+                            startFling(vx, vy)
+                        } else {
+                            prefs.overlayX = mochiParams.x
+                            prefs.overlayY = mochiParams.y
+                        }
                     } else if (!longPressed) {
                         onTapped()
                     }
+                    tracker?.recycle(); tracker = null
                 }
-                MotionEvent.ACTION_CANCEL -> handler.removeCallbacks(longPress)
+                MotionEvent.ACTION_CANCEL -> {
+                    handler.removeCallbacks(longPress)
+                    tracker?.recycle(); tracker = null
+                }
             }
             return true
+        }
+    }
+
+    // ---------- ぶん投げ & 壁でバウンド ----------
+
+    private data class Bounds(val minX: Int, val maxX: Int, val minY: Int, val maxY: Int)
+
+    /**
+     * もちもちが動ける範囲。Viewのまわりには透明な余白があるので、
+     * からだそのものが画面の端にぴったり当たるように、少しはみ出すのを許す。
+     */
+    private fun bounds(): Bounds {
+        val (sw, sh) = screenSize()
+        val m = mochi
+        val w = m?.width?.takeIf { it > 0 } ?: (96 * resources.displayMetrics.density).toInt()
+        val h = m?.height?.takeIf { it > 0 } ?: w
+        return Bounds(
+            minX = -(w * 0.1f).toInt(),
+            maxX = sw - (w * 0.9f).toInt(),
+            minY = -(h * 0.18f).toInt(),
+            maxY = sh - (h * 0.97f).toInt(),
+        )
+    }
+
+    private var flingVX = 0f
+    private var flingVY = 0f
+    private var flingX = 0f
+    private var flingY = 0f
+    private var lastFrameNanos = 0L
+    private var flinging = false
+    private var lastOuchAt = 0L
+
+    private val flingFrame = object : Choreographer.FrameCallback {
+        override fun doFrame(frameTimeNanos: Long) {
+            val m = mochi ?: return
+            if (!flinging) return
+            val dt = if (lastFrameNanos == 0L) 1f / 60f
+            else ((frameTimeNanos - lastFrameNanos) / 1e9f).coerceIn(0.001f, 0.05f)
+            lastFrameNanos = frameTimeNanos
+
+            val d = resources.displayMetrics.density
+            val b = bounds()
+
+            flingX += flingVX * dt
+            flingY += flingVY * dt
+
+            // 壁にぶつかったら跳ね返る(少しずつ勢いがなくなる)
+            var hitH = 0f
+            var hitV = 0f
+            if (flingX < b.minX) { flingX = b.minX.toFloat(); hitH = abs(flingVX); flingVX = abs(flingVX) * RESTITUTION }
+            if (flingX > b.maxX) { flingX = b.maxX.toFloat(); hitH = abs(flingVX); flingVX = -abs(flingVX) * RESTITUTION }
+            if (flingY < b.minY) { flingY = b.minY.toFloat(); hitV = abs(flingVY); flingVY = abs(flingVY) * RESTITUTION }
+            if (flingY > b.maxY) { flingY = b.maxY.toFloat(); hitV = abs(flingVY); flingVY = -abs(flingVY) * RESTITUTION }
+            val hit = maxOf(hitH, hitV)
+            if (hit > 150 * d) {
+                val strength = hit / (2500 * d)
+                m.bump(horizontal = hitH >= hitV, strength = strength)
+                val now = System.currentTimeMillis()
+                if (strength > 0.6f && now - lastOuchAt > 2500 && Random.nextInt(3) == 0) {
+                    lastOuchAt = now
+                    talk(MochiLines.ouch(prefs.masterName))
+                }
+            }
+
+            // 空気でだんだん止まる
+            val friction = exp(-FRICTION * dt)
+            flingVX *= friction
+            flingVY *= friction
+
+            mochiParams.x = flingX.toInt()
+            mochiParams.y = flingY.toInt()
+            wm.updateViewLayout(m, mochiParams)
+            if (bubbleShown) positionBubble()
+
+            if (hypot(flingVX, flingVY) < 40 * d) stopFling(save = true)
+            else Choreographer.getInstance().postFrameCallback(this)
+        }
+    }
+
+    private fun startFling(vx: Float, vy: Float) {
+        val d = resources.displayMetrics.density
+        val max = 7000 * d
+        val speed = hypot(vx, vy)
+        val k = if (speed > max) max / speed else 1f
+        flingVX = vx * k
+        flingVY = vy * k
+        flingX = mochiParams.x.toFloat()
+        flingY = mochiParams.y.toFloat()
+        lastFrameNanos = 0L
+        flinging = true
+        Choreographer.getInstance().postFrameCallback(flingFrame)
+    }
+
+    private fun stopFling(save: Boolean) {
+        if (!flinging) return
+        flinging = false
+        Choreographer.getInstance().removeFrameCallback(flingFrame)
+        if (save) {
+            prefs.overlayX = mochiParams.x
+            prefs.overlayY = mochiParams.y
         }
     }
 
@@ -292,6 +425,8 @@ class OverlayService : Service() {
         private const val CHANNEL_ID = "mochi_overlay"
         private const val NOTIFICATION_ID = 1
         private const val ACTION_STOP = "com.mochimate.maid.STOP"
+        private const val RESTITUTION = 0.72f // 跳ね返りの強さ(1で減らない)
+        private const val FRICTION = 1.3f     // 空気の抵抗(大きいほど早く止まる)
 
         @Volatile
         var isRunning = false
