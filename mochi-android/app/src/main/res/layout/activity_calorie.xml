@@ -64,6 +64,26 @@
                 android:orientation="vertical" />
         </LinearLayout>
 
+        <!-- 今日の点数 -->
+        <LinearLayout
+            android:id="@+id/scoreCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/card_bg"
+            android:orientation="vertical"
+            android:padding="16dp" />
+
+        <!-- 体重 -->
+        <LinearLayout
+            android:id="@+id/weightCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/card_bg"
+            android:orientation="vertical"
+            android:padding="16dp" />
+
         <!-- 朝・昼・夜・間食 -->
         <LinearLayout
             android:id="@+id/meals"

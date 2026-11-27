@@ -56,6 +56,11 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".WeightActivity"
+            android:exported="false"
+            android:label="体重" />
+
+        <activity
             android:name=".FoodSearchActivity"
             android:exported="false"
             android:label="食べたものを追加"

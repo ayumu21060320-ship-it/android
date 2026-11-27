@@ -203,6 +203,7 @@ class OverlayService : Service() {
         registerReceiver(batteryReceiver, filter)
         registerReceiver(screenReceiver, IntentFilter(Intent.ACTION_SCREEN_ON))
         homeWifi = HomeWifiWatcher(this).also { it.start() }
+        handler.postDelayed(dietReview, 60_000)
 
         // 登場のあいさつ。天気のお世話を選んでいれば、続けて今日の天気も伝える。
         handler.postDelayed({ talk(MochiLines.greeting(prefs.masterName)) }, 400)
@@ -536,6 +537,22 @@ class OverlayService : Service() {
             .onSuccess { LockDiag.log(this, "方法2 依頼しました") }
     }
 
+    // ---------- 夜のごはんのふり返り ----------
+
+    /** 夜9時をすぎたら、1日1回だけ今日の食事をふり返る */
+    private val dietReview = object : Runnable {
+        override fun run() {
+            val now = java.util.Calendar.getInstance()
+            val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(now.time)
+            if (prefs.careCalorie && now.get(java.util.Calendar.HOUR_OF_DAY) >= 21 && prefs.lastDietReview != today && rich == null) {
+                prefs.lastDietReview = today
+                mochi?.react()
+                talk(DietScore.review(CalorieStore(this@OverlayService), prefs.masterName))
+            }
+            handler.postDelayed(this, 10 * 60_000)
+        }
+    }
+
     // ---------- 電池 ----------
 
     private var lastBatteryWarn = 101
@@ -575,7 +592,8 @@ class OverlayService : Service() {
         b.text = text
         setBubbleVisible(true)
         handler.removeCallbacks(hideBubble)
-        handler.postDelayed(hideBubble, 6000)
+        // 長いセリフほど長く出しておく(6〜15秒)
+        handler.postDelayed(hideBubble, (3000L + text.length * 110L).coerceIn(6000L, 15000L))
     }
 
     private fun setBubbleVisible(visible: Boolean) {

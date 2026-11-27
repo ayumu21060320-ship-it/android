@@ -93,6 +93,11 @@ class Prefs(context: Context) {
         get() = sp.getLong("home_last_at", 0L)
         set(v) = sp.edit().putLong("home_last_at", v).apply()
 
+    /** 最後に夜のごはんのふり返りをした日(yyyy-MM-dd) */
+    var lastDietReview: String?
+        get() = sp.getString("diet_review", null)
+        set(v) = sp.edit().putString("diet_review", v).apply()
+
     /** ロック画面を見た時にもメイドさんが出てくるか */
     var lockScreenMaid: Boolean
         get() = sp.getBoolean("lock_maid", true)

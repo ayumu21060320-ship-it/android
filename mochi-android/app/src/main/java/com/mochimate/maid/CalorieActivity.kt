@@ -53,8 +53,91 @@ class CalorieActivity : Activity() {
         findViewById<TextView>(R.id.dateLabel).text = SimpleDateFormat("M月d日(E)", Locale.JAPAN).format(Date()) + " のカロリー"
         findViewById<RingView>(R.id.ring).set(t.kcal, store.goal)
         renderPfc(t)
+        renderScore(t)
+        renderWeight()
         renderMeals()
         refreshGoalText()
+    }
+
+    private fun renderScore(t: DayTotal) {
+        val box = findViewById<LinearLayout>(R.id.scoreCard)
+        box.removeAllViews()
+        val s = DietScore.of(store, t)
+        val head = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        head.addView(TextView(this).apply {
+            text = "📝 今日の点数"; textSize = 16f; setTextColor(getColor(R.color.ink)); paint.isFakeBoldText = true
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        head.addView(TextView(this).apply {
+            text = s?.let { "${it.total}点" } ?: "－"
+            textSize = 26f; setTextColor(getColor(R.color.accent)); paint.isFakeBoldText = true
+        })
+        box.addView(head)
+        box.addView(TextView(this).apply {
+            text = if (s == null) "記録すると、カロリーと栄養バランスから点数をつけます"
+            else "${s.rank}　カロリー ${s.kcal}/40・たんぱく質 ${s.p}/20・脂質 ${s.f}/20・炭水化物 ${s.c}/20"
+            textSize = 13f; setTextColor(getColor(R.color.ink_sub)); setPadding(0, px(4), 0, 0)
+        })
+        if (s != null) {
+            box.addView(TextView(this).apply {
+                text = "メイドさんのふり返りを聞く ›"
+                textSize = 14f; setTextColor(getColor(R.color.accent)); paint.isFakeBoldText = true
+                setPadding(0, px(8), 0, 0)
+                setOnClickListener { mochi.react(); say.text = DietScore.review(store, prefs.masterName) }
+            })
+        }
+    }
+
+    private fun renderWeight() {
+        val ws = WeightStore(this)
+        val box = findViewById<LinearLayout>(R.id.weightCard)
+        box.removeAllViews()
+        val head = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        head.addView(TextView(this).apply {
+            text = "⚖️ 体重"; textSize = 16f; setTextColor(getColor(R.color.ink)); paint.isFakeBoldText = true
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        val last = ws.latest()
+        head.addView(TextView(this).apply {
+            text = last?.let { "${it.second} kg" } ?: "未記録"
+            textSize = 22f; setTextColor(getColor(R.color.ink)); paint.isFakeBoldText = true
+        })
+        box.addView(head)
+        val diff = ws.diffFromPrevious()
+        val t = ws.target
+        box.addView(TextView(this).apply {
+            text = buildString {
+                if (diff != null) append(if (diff <= 0) "前回より ${"%.1f".format(-diff)}kg 減" else "前回より ${"%.1f".format(diff)}kg 増")
+                if (t != null && last != null) {
+                    if (isNotEmpty()) append("　")
+                    append("目標 ${t}kg まで あと${"%.1f".format(kotlin.math.abs(last.second - t))}kg")
+                }
+                if (isEmpty()) append("毎日はかると、変化がグラフでわかります")
+            }
+            textSize = 13f; setTextColor(getColor(R.color.ink_sub)); setPadding(0, px(2), 0, 0)
+        })
+        val chart = WeightChartView(this).apply {
+            set(ws.all(), t, ws.prediction(), 30)
+            setOnClickListener { startActivity(Intent(this@CalorieActivity, WeightActivity::class.java)) }
+        }
+        box.addView(chart, LinearLayout.LayoutParams(-1, px(150)).apply { topMargin = px(6) })
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        fun btn(label: String, onClick: () -> Unit) = TextView(this).apply {
+            text = label; textSize = 14f; gravity = Gravity.CENTER
+            setTextColor(getColor(R.color.accent)); paint.isFakeBoldText = true
+            setBackgroundResource(R.drawable.button_sub_bg)
+            setOnClickListener { onClick() }
+        }
+        row.addView(btn("今日の体重を記録") {
+            WeightDialogs.record(this) {
+                refresh()
+                mochi.react()
+                say.text = WeightStore(this).line(prefs.masterName)
+                findViewById<EditText>(R.id.weight).setText(CalorieStore(this).weightKg.toString())
+            }
+        }, LinearLayout.LayoutParams(0, px(42), 1f))
+        row.addView(btn("グラフ・目標 ›") {
+            startActivity(Intent(this@CalorieActivity, WeightActivity::class.java))
+        }, LinearLayout.LayoutParams(0, px(42), 1f).apply { marginStart = px(8) })
+        box.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = px(8) })
     }
 
     private fun renderPfc(t: DayTotal) {
