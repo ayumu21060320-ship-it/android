@@ -71,26 +71,51 @@ class HomeWifiWatcher(private val context: Context) {
     private fun ssidFrom(caps: NetworkCapabilities): String? {
         val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) caps.transportInfo as? WifiInfo else null
         @Suppress("DEPRECATION")
-        val raw = info?.ssid ?: wifi?.connectionInfo?.ssid
-        return clean(raw)
+        return clean(info?.ssid) ?: clean(wifi?.connectionInfo?.ssid)
     }
 
     companion object {
-        /** 今つながっている Wi-Fi の名前(わからなければ null) */
-        fun currentSsid(context: Context): String? = runCatching { readSsid(context) }.getOrNull()
-
-        private fun readSsid(context: Context): String? {
+        /**
+         * 今つながっている Wi-Fi の名前を調べる。
+         * Android 12 以降は「位置情報を含めて」と頼んだ問い合わせでないと名前が「不明」になるので、
+         * その方法で聞いて、だめなら古い方法も試す。結果はメインスレッドで返す。
+         */
+        fun currentSsid(context: Context, callback: (String?) -> Unit) {
+            val main = Handler(Looper.getMainLooper())
             val cm = context.getSystemService(ConnectivityManager::class.java)
-            val caps = cm.getNetworkCapabilities(cm.activeNetwork)
-            val fromCaps = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) (caps?.transportInfo as? WifiInfo)?.ssid else null
-            @Suppress("DEPRECATION")
-            val raw = fromCaps ?: context.applicationContext.getSystemService(WifiManager::class.java)?.connectionInfo?.ssid
-            return clean(raw)
+            val wifi = context.applicationContext.getSystemService(WifiManager::class.java)
+            var done = false
+            fun finish(ssid: String?, cb: ConnectivityManager.NetworkCallback?) {
+                main.post {
+                    if (done) return@post
+                    done = true
+                    cb?.let { runCatching { cm.unregisterNetworkCallback(it) } }
+                    @Suppress("DEPRECATION")
+                    callback(ssid ?: runCatching { clean(wifi?.connectionInfo?.ssid) }.getOrNull())
+                }
+            }
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                finish(null, null)
+                return
+            }
+            val cb = object : ConnectivityManager.NetworkCallback(FLAG_INCLUDE_LOCATION_INFO) {
+                override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+                    val ssid = clean((caps.transportInfo as? WifiInfo)?.ssid)
+                    if (ssid != null) finish(ssid, this)
+                }
+            }
+            val req = NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build()
+            if (runCatching { cm.registerNetworkCallback(req, cb) }.isFailure) {
+                finish(null, null)
+                return
+            }
+            // 3秒たってもわからなければ、古い方法の結果を返す
+            main.postDelayed({ finish(null, cb) }, 3_000)
         }
 
         private fun clean(raw: String?): String? {
             val s = raw?.trim()?.removeSurrounding("\"") ?: return null
-            if (s.isEmpty() || s == WifiManager.UNKNOWN_SSID.removeSurrounding("<", ">") || s == "<unknown ssid>") return null
+            if (s.isEmpty() || s == "<unknown ssid>" || s.equals("unknown ssid", true)) return null
             return s
         }
     }

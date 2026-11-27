@@ -135,11 +135,17 @@ class HomeSettings(private val activity: Activity, private val card: LinearLayou
             )
             return
         }
-        val ssid = HomeWifiWatcher.currentSsid(activity)
-        if (ssid == null) {
-            status.text = "⚠️ Wi-Fi の名前がわかりませんでした。家の Wi-Fi につながっていて、位置情報がオンになっているか確かめてね"
-            return
+        status.text = "Wi-Fi を調べています…"
+        HomeWifiWatcher.currentSsid(activity) { ssid ->
+            if (ssid == null) {
+                status.text = "⚠️ Wi-Fi の名前がわかりませんでした。家の Wi-Fi につながっていて、位置情報がオンになっているか確かめてね"
+            } else {
+                saveWifi(ssid)
+            }
         }
+    }
+
+    private fun saveWifi(ssid: String) {
         prefs.homeWifi = ssid
         prefs.lastHomeEntered = true // 今は家にいるので、登録した瞬間に「おかえり」とは言わない
         prefs.lastHomeEventAt = System.currentTimeMillis()
