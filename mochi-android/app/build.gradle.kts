@@ -42,5 +42,7 @@ android {
 }
 
 dependencies {
+    // おうちに着いた・出た、を電池にやさしく見張る(ジオフェンス)
+    implementation("com.google.android.gms:play-services-location:21.3.0")
     testImplementation("junit:junit:4.13.2")
 }

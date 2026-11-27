@@ -26,6 +26,7 @@ class MainActivity : Activity() {
     private lateinit var hello: TextView
     private lateinit var permissionCard: View
     private lateinit var toggle: Button
+    private lateinit var home: HomeSettings
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,6 +62,7 @@ class MainActivity : Activity() {
         }
         setupCitySearch()
         bindCheck(R.id.drift, prefs.driftEnabled) { prefs.driftEnabled = it }
+        home = HomeSettings(this, findViewById(R.id.homeCard)).also { it.build() }
         bindCheck(R.id.lockMaid, prefs.lockScreenMaid) { prefs.lockScreenMaid = it }
         findViewById<Button>(R.id.lockDiag).setOnClickListener {
             val needFsi = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
@@ -129,8 +131,17 @@ class MainActivity : Activity() {
         }
     }
 
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        home.onPermissionResult(requestCode)
+    }
+
     override fun onResume() {
         super.onResume()
+        if (::home.isInitialized) {
+            home.refresh()
+            HomeGeofence.register(this) // 「常に許可」にして戻ってきた時に見守りを始める
+        }
         MochiNotificationListener.ensureConnected(this)
         refresh()
     }

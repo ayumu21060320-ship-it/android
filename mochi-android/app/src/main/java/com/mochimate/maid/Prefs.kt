@@ -52,6 +52,38 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("battery_talk", true)
         set(v) = sp.edit().putBoolean("battery_talk", v).apply()
 
+    // ---------- おうち ----------
+
+    /** おかえり・いってらっしゃいを使うか */
+    var homeEnabled: Boolean
+        get() = sp.getBoolean("home_enabled", false)
+        set(v) = sp.edit().putBoolean("home_enabled", v).apply()
+
+    val homeLat: Double? get() = sp.getString("home_lat", null)?.toDoubleOrNull()
+    val homeLon: Double? get() = sp.getString("home_lon", null)?.toDoubleOrNull()
+
+    fun setHome(lat: Double, lon: Double) {
+        sp.edit().putString("home_lat", lat.toString()).putString("home_lon", lon.toString()).apply()
+    }
+
+    /** おうちとみなす範囲(メートル) */
+    var homeRadius: Int
+        get() = sp.getInt("home_radius", 150)
+        set(v) = sp.edit().putInt("home_radius", v).apply()
+
+    /** 出かける時に「いってらっしゃい」も言うか */
+    var homeSayGoodbye: Boolean
+        get() = sp.getBoolean("home_goodbye", true)
+        set(v) = sp.edit().putBoolean("home_goodbye", v).apply()
+
+    var lastHomeEntered: Boolean
+        get() = sp.getBoolean("home_last_in", true)
+        set(v) = sp.edit().putBoolean("home_last_in", v).apply()
+
+    var lastHomeEventAt: Long
+        get() = sp.getLong("home_last_at", 0L)
+        set(v) = sp.edit().putLong("home_last_at", v).apply()
+
     /** ロック画面を見た時にもメイドさんが出てくるか */
     var lockScreenMaid: Boolean
         get() = sp.getBoolean("lock_maid", true)

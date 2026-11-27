@@ -10,6 +10,12 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- 常駐中の通知を出すための権限(Android 13以降) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- おうちに着いた・出たを知るため(場所はスマホの中だけで使う) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- 再起動したあと、おうちの見張りをやり直すため -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- ロック画面にメイドさんを出すため(目覚ましアプリと同じ仕組み) -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
@@ -71,6 +77,19 @@
             android:name=".IntegrationActivity"
             android:exported="false"
             android:label="連携" />
+
+        <receiver
+            android:name=".HomeGeofenceReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".HomeBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <service
             android:name=".MochiNotificationListener"
