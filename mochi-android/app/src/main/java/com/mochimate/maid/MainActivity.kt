@@ -61,6 +61,7 @@ class MainActivity : Activity() {
         }
         setupCitySearch()
         bindCheck(R.id.drift, prefs.driftEnabled) { prefs.driftEnabled = it }
+        bindCheck(R.id.lockMaid, prefs.lockScreenMaid) { prefs.lockScreenMaid = it }
         val openCalorie = findViewById<Button>(R.id.openCalorie)
         openCalorie.visibility = if (prefs.careCalorie) View.VISIBLE else View.GONE
         openCalorie.setOnClickListener { startActivity(Intent(this, CalorieActivity::class.java)) }

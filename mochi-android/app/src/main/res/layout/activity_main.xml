@@ -82,6 +82,14 @@
                 android:text="🎈 勝手にふわふわ動き回る"
                 android:textColor="@color/ink"
                 android:textSize="16sp" />
+
+            <CheckBox
+                android:id="@+id/lockMaid"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="🔒 ロック画面を見た時にも出てくる"
+                android:textColor="@color/ink"
+                android:textSize="16sp" />
         </LinearLayout>
 
         <!-- お世話の種類 -->

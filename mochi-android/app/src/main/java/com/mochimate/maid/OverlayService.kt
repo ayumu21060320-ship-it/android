@@ -1,6 +1,7 @@
 package com.mochimate.maid
 
 import android.annotation.SuppressLint
+import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -95,6 +96,7 @@ class OverlayService : Service() {
         isRunning = false
         if (instance === this) instance = null
         runCatching { unregisterReceiver(batteryReceiver) }
+        runCatching { unregisterReceiver(screenReceiver) }
         card?.dismiss()
         dismissRich(resume = false)
         stopFling(save = true)
@@ -197,6 +199,7 @@ class OverlayService : Service() {
             addAction(Intent.ACTION_POWER_CONNECTED)
         }
         registerReceiver(batteryReceiver, filter)
+        registerReceiver(screenReceiver, IntentFilter(Intent.ACTION_SCREEN_ON))
 
         // 登場のあいさつ。天気のお世話を選んでいれば、続けて今日の天気も伝える。
         handler.postDelayed({ talk(MochiLines.greeting(prefs.masterName)) }, 400)
@@ -470,6 +473,23 @@ class OverlayService : Service() {
         startActivity(
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
+    }
+
+    // ---------- ロック画面 ----------
+
+    /** 画面がついた時、ロックがかかっていたらロック画面にもメイドさんを出す */
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (!prefs.lockScreenMaid || LockMaidActivity.isShowing) return
+            val km = getSystemService(KeyguardManager::class.java)
+            if (km?.isKeyguardLocked != true) return
+            runCatching {
+                startActivity(
+                    Intent(this@OverlayService, LockMaidActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION),
+                )
+            }
+        }
     }
 
     // ---------- 電池 ----------

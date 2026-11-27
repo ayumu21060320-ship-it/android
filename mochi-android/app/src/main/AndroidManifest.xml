@@ -51,6 +51,16 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".LockMaidActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:noHistory="true"
+            android:showWhenLocked="true"
+            android:taskAffinity="com.mochimate.maid.lock"
+            android:theme="@style/Theme.MochiMaid.Lock" />
+
+        <activity
             android:name=".HistoryActivity"
             android:exported="false"
             android:label="通知の履歴" />

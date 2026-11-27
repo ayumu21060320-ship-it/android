@@ -52,6 +52,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("battery_talk", true)
         set(v) = sp.edit().putBoolean("battery_talk", v).apply()
 
+    /** ロック画面を見た時にもメイドさんが出てくるか */
+    var lockScreenMaid: Boolean
+        get() = sp.getBoolean("lock_maid", true)
+        set(value) = sp.edit().putBoolean("lock_maid", value).apply()
+
     /** 勝手にふわふわ動き回るか */
     var driftEnabled: Boolean
         get() = sp.getBoolean("drift", true)
