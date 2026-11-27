@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- 常駐中の通知を出すための権限(Android 13以降) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- ロック画面にメイドさんを出すため(目覚ましアプリと同じ仕組み) -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <!-- 連携の設定画面で、インストールされているアプリの一覧を出すため -->
     <queries>

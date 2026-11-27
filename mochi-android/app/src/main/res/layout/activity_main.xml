@@ -90,6 +90,16 @@
                 android:text="🔒 ロック画面を見た時にも出てくる"
                 android:textColor="@color/ink"
                 android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/lockDiag"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginStart="32dp"
+                android:background="@drawable/button_sub_bg"
+                android:text="ロック画面の記録を見る"
+                android:textColor="@color/ink_sub"
+                android:textSize="13sp" />
         </LinearLayout>
 
         <!-- お世話の種類 -->

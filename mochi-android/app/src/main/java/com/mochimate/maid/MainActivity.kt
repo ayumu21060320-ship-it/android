@@ -62,6 +62,25 @@ class MainActivity : Activity() {
         setupCitySearch()
         bindCheck(R.id.drift, prefs.driftEnabled) { prefs.driftEnabled = it }
         bindCheck(R.id.lockMaid, prefs.lockScreenMaid) { prefs.lockScreenMaid = it }
+        findViewById<Button>(R.id.lockDiag).setOnClickListener {
+            val needFsi = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+                !getSystemService(android.app.NotificationManager::class.java).canUseFullScreenIntent()
+            val b = android.app.AlertDialog.Builder(this)
+                .setTitle("ロック画面の記録")
+                .setMessage(
+                    (if (needFsi) "⚠️「全画面通知」が許可されていません。下のボタンから許可すると、ロック画面に出やすくなります。\n\n" else "") +
+                        LockDiag.read(this),
+                )
+                .setPositiveButton("閉じる", null)
+            if (needFsi) {
+                b.setNeutralButton("全画面通知を許可") { _, _ ->
+                    startActivity(
+                        Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:$packageName")),
+                    )
+                }
+            }
+            b.show()
+        }
         val openCalorie = findViewById<Button>(R.id.openCalorie)
         openCalorie.visibility = if (prefs.careCalorie) View.VISIBLE else View.GONE
         openCalorie.setOnClickListener { startActivity(Intent(this, CalorieActivity::class.java)) }

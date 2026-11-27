@@ -74,6 +74,9 @@ class LockMaidActivity : Activity() {
             addAction(Intent.ACTION_SCREEN_OFF)
         })
         isShowing = true
+        LockDiag.log(this, "ロック画面のメイドさんを開きました")
+        // 方法2で開いた時の通知は、もういらないので消す
+        getSystemService(android.app.NotificationManager::class.java)?.cancel(OverlayService.LOCK_NOTIFICATION_ID)
         mochi.postDelayed({ mochi.react() }, 300)
     }
 
@@ -90,6 +93,16 @@ class LockMaidActivity : Activity() {
             @Suppress("DEPRECATION")
             overridePendingTransition(0, 0)
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        LockDiag.log(this, "表示されました")
+    }
+
+    override fun onStop() {
+        super.onStop()
+        LockDiag.log(this, "見えなくなりました")
     }
 
     override fun onDestroy() {

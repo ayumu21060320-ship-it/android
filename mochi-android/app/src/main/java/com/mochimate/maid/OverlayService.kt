@@ -480,16 +480,57 @@ class OverlayService : Service() {
     /** 画面がついた時、ロックがかかっていたらロック画面にもメイドさんを出す */
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (!prefs.lockScreenMaid || LockMaidActivity.isShowing) return
             val km = getSystemService(KeyguardManager::class.java)
+            LockDiag.log(this@OverlayService, "画面ON ロック=${km?.isKeyguardLocked} 設定=${prefs.lockScreenMaid} 表示中=${LockMaidActivity.isShowing}")
+            if (!prefs.lockScreenMaid || LockMaidActivity.isShowing) return
             if (km?.isKeyguardLocked != true) return
-            runCatching {
+            // 方法1: そのまま画面を開く
+            val r = runCatching {
                 startActivity(
                     Intent(this@OverlayService, LockMaidActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION),
                 )
             }
+            LockDiag.log(this@OverlayService, "方法1 " + (r.exceptionOrNull()?.let { "失敗: ${it.javaClass.simpleName}" } ?: "依頼しました"))
+            // 方法2: 開かなかったら、目覚ましアプリと同じ「全画面通知」で開く
+            handler.postDelayed({
+                if (!LockMaidActivity.isShowing && km.isKeyguardLocked) {
+                    LockDiag.log(this@OverlayService, "方法1では開かなかったので、方法2(全画面通知)を試します")
+                    postLockFullScreen()
+                }
+            }, 700)
         }
+    }
+
+    private fun postLockFullScreen() {
+        val nm = getSystemService(NotificationManager::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && !nm.canUseFullScreenIntent()) {
+            LockDiag.log(this, "方法2: 全画面通知が許可されていません")
+            return
+        }
+        nm.createNotificationChannel(
+            NotificationChannel(LOCK_CHANNEL, "ロック画面のメイドさん", NotificationManager.IMPORTANCE_HIGH).apply {
+                setSound(null, null)
+                enableVibration(false)
+                setShowBadge(false)
+            },
+        )
+        val pi = PendingIntent.getActivity(
+            this, 3, Intent(this, LockMaidActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val n = Notification.Builder(this, LOCK_CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("メイドさん")
+            .setContentText("ロック画面にいます")
+            .setCategory(Notification.CATEGORY_REMINDER)
+            .setFullScreenIntent(pi, true)
+            .setAutoCancel(true)
+            .setTimeoutAfter(15_000)
+            .build()
+        runCatching { nm.notify(LOCK_NOTIFICATION_ID, n) }
+            .onFailure { LockDiag.log(this, "方法2 失敗: ${it.javaClass.simpleName}") }
+            .onSuccess { LockDiag.log(this, "方法2 依頼しました") }
     }
 
     // ---------- 電池 ----------
@@ -641,6 +682,8 @@ class OverlayService : Service() {
         private const val CHANNEL_ID = "mochi_overlay"
         private const val NOTIFICATION_ID = 1
         private const val ACTION_STOP = "com.mochimate.maid.STOP"
+        private const val LOCK_CHANNEL = "mochi_lock"
+        const val LOCK_NOTIFICATION_ID = 7
         private const val RESTITUTION = 0.72f // 跳ね返りの強さ(1で減らない)
         private const val FRICTION = 1.3f     // 空気の抵抗(大きいほど早く止まる)
 
