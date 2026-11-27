@@ -3,6 +3,7 @@ package com.mochimate.maid
 import android.app.ActivityOptions
 import android.app.Notification
 import android.app.PendingIntent
+import android.content.ComponentName
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.service.notification.NotificationListenerService
@@ -28,6 +29,16 @@ class MochiNotificationListener : NotificationListenerService() {
         prefs = Prefs(this)
     }
 
+    override fun onListenerConnected() {
+        connected = true
+    }
+
+    override fun onListenerDisconnected() {
+        connected = false
+        // 切れたら、つなぎ直してもらうようにお願いする
+        runCatching { requestRebind(ComponentName(this, MochiNotificationListener::class.java)) }
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val n = sbn.notification
         // 自分のアプリの通知は無視。ただし「テストの支払い通知」だけは本物の支払いアプリとして扱う
@@ -48,7 +59,7 @@ class MochiNotificationListener : NotificationListenerService() {
             val pay = PaymentParser.parse(title, text)
             if (pay != null) {
                 val money = MoneyStore(this)
-                if (!money.isDuplicate(pay.amount, label)) {
+                if (isTest || !money.isDuplicate(pay.amount, label)) {
                     val time = System.currentTimeMillis()
                     val category = MoneyStore.guessCategory(pay.store)
                     money.add(MoneyEntry(pay.amount, category, pay.store ?: label, time, label))
@@ -165,6 +176,23 @@ class MochiNotificationListener : NotificationListenerService() {
 
     companion object {
         const val EXTRA_TEST = "com.mochimate.maid.TEST_PAYMENT"
+
+        /** いま通知を受け取れる状態か(アプリの更新後などは、許可がオンでも切れていることがある) */
+        @Volatile
+        var connected = false
+            private set
+
+        fun isGranted(context: android.content.Context): Boolean =
+            android.provider.Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
+                ?.contains(context.packageName) == true
+
+        /** 許可されているのに切れていたら、つなぎ直す */
+        fun ensureConnected(context: android.content.Context) {
+            if (!isGranted(context) || connected) return
+            runCatching {
+                requestRebind(ComponentName(context, MochiNotificationListener::class.java))
+            }
+        }
         private val STOP = Regex("解除|停止|止める|オフ|閉じる|dismiss|stop|turn off", RegexOption.IGNORE_CASE)
         private val SNOOZE = Regex("スヌーズ|snooze|後で", RegexOption.IGNORE_CASE)
 

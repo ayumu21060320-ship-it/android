@@ -85,6 +85,7 @@ class OverlayService : Service() {
             return START_NOT_STICKY
         }
         if (mochi == null) showMochi()
+        MochiNotificationListener.ensureConnected(this)
         isRunning = true
         instance = this
         return START_STICKY

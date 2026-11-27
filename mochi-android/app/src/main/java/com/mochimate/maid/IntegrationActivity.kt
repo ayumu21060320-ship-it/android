@@ -108,10 +108,14 @@ class IntegrationActivity : Activity() {
             setTextColor(getColor(R.color.accent))
             setBackgroundResource(R.drawable.button_sub_bg)
             setOnClickListener {
-                val granted = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
-                    ?.contains(packageName) == true
+                val granted = MochiNotificationListener.isGranted(this@IntegrationActivity)
                 when {
                     !granted -> text = "先に通知へのアクセスを許可してね"
+                    !MochiNotificationListener.connected -> {
+                        MochiNotificationListener.ensureConnected(this@IntegrationActivity)
+                        text = "通知の読み取りをつなぎ直しています。少し待ってからもう一度押してね"
+                    }
+                    !OverlayService.isRunning -> text = "先にメイドさんをホーム画面に呼んでね"
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                         checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED -> {
                         requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 2)
@@ -145,10 +149,17 @@ class IntegrationActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        val granted = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
-            ?.contains(packageName) == true
-        status.text = if (granted) "✅ 許可されています" else "⚠️ まだ許可されていません"
+        val granted = MochiNotificationListener.isGranted(this)
+        MochiNotificationListener.ensureConnected(this)
+        status.text = when {
+            !granted -> "⚠️ まだ許可されていません"
+            MochiNotificationListener.connected -> "✅ 許可されていて、通知を受け取れます"
+            else -> "🔄 許可されていますが、つなぎ直しています…\n（直らない時は、一度オフにしてからオンに戻してください）"
+        }
         status.setTextColor(getColor(if (granted) R.color.ink else R.color.accent))
+        if (granted && !MochiNotificationListener.connected) {
+            status.postDelayed({ if (!isFinishing) onResume() }, 2000)
+        }
         grant.text = if (granted) "通知へのアクセスの設定を開く" else "通知へのアクセスを許可する"
     }
 
