@@ -9,16 +9,41 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
+/** 食事の区分 */
+enum class Meal(val label: String, val emoji: String) {
+    BREAKFAST("朝ごはん", "🌅"), LUNCH("昼ごはん", "☀️"), DINNER("夜ごはん", "🌙"), SNACK("間食", "🍪");
+
+    companion object {
+        /** 今の時間に合いそうな区分 */
+        fun now(): Meal = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
+            in 4..10 -> BREAKFAST
+            in 11..15 -> LUNCH
+            in 17..23 -> DINNER
+            else -> SNACK
+        }
+    }
+}
+
 /** 1品ぶんの記録 */
-data class FoodEntry(val name: String, val kcal: Int, val time: Long)
+data class FoodEntry(
+    val name: String,
+    val kcal: Int,
+    val time: Long,
+    val meal: Meal = Meal.SNACK,
+    val grams: Double = 0.0,
+    val p: Double = 0.0,
+    val f: Double = 0.0,
+    val c: Double = 0.0,
+    /** 成分表の食品番号(成分表から選んだ時だけ) */
+    val foodId: String? = null,
+)
 
-/** よく食べるもの(ワンタップで記録できる) */
-data class FoodPreset(val name: String, val kcal: Int, val custom: Boolean)
+/** 自分で登録した「マイ食品」(1回分の栄養) */
+data class FoodPreset(val name: String, val kcal: Int, val custom: Boolean, val p: Double = 0.0, val f: Double = 0.0, val c: Double = 0.0)
 
-/**
- * カロリー管理のデータ置き場。
- * 体のデータ・今日の記録・よく食べるものを、すべてスマホの中だけに保存する。
- */
+/** 1日の合計 */
+data class DayTotal(val kcal: Int, val p: Double, val f: Double, val c: Double)
+
 class CalorieStore(context: Context) {
 
     private val sp = context.getSharedPreferences("mochi_calorie", Context.MODE_PRIVATE)
@@ -60,56 +85,106 @@ class CalorieStore(context: Context) {
             return ((bmr * factor + adjust) / 10).roundToInt() * 10
         }
 
-    // ---------- 今日の記録(日付が変わったら自動でリセット) ----------
+    /** 1日の目標 PFC(g)。たんぱく質20%・脂質25%・炭水化物55% のバランスで計算 */
+    val goalP: Double get() = goal * 0.20 / 4
+    val goalF: Double get() = goal * 0.25 / 9
+    val goalC: Double get() = goal * 0.55 / 4
 
-    private fun today() = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+    // ---------- 毎日の記録(日付ごとに保存。グラフ用に残しておく) ----------
 
-    fun todayEntries(): List<FoodEntry> {
-        if (sp.getString("log_date", null) != today()) return emptyList()
-        val arr = runCatching { JSONArray(sp.getString("log", "[]")) }.getOrElse { JSONArray() }
-        return (0 until arr.length()).map {
-            val o = arr.getJSONObject(it)
-            FoodEntry(o.getString("name"), o.getInt("kcal"), o.optLong("time"))
+    private fun dayKey(date: Date = Date()) = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date)
+
+    init {
+        // 前の版(今日の分だけ保存していた形式)からの引っ越し
+        val oldDate = sp.getString("log_date", null)
+        val old = sp.getString("log", null)
+        if (oldDate != null && old != null && !sp.contains("day_$oldDate")) {
+            sp.edit().putString("day_$oldDate", old).remove("log").remove("log_date").apply()
         }
     }
 
-    private fun saveToday(list: List<FoodEntry>) {
-        val arr = JSONArray()
-        list.forEach { arr.put(JSONObject().put("name", it.name).put("kcal", it.kcal).put("time", it.time)) }
-        sp.edit().putString("log_date", today()).putString("log", arr.toString()).apply()
+    fun entries(date: Date = Date()): List<FoodEntry> {
+        val arr = runCatching { JSONArray(sp.getString("day_" + dayKey(date), "[]")) }.getOrElse { JSONArray() }
+        return (0 until arr.length()).map {
+            val o = arr.getJSONObject(it)
+            FoodEntry(
+                name = o.getString("name"),
+                kcal = o.getInt("kcal"),
+                time = o.optLong("time"),
+                meal = runCatching { Meal.valueOf(o.optString("meal")) }.getOrDefault(Meal.SNACK),
+                grams = o.optDouble("g", 0.0),
+                p = o.optDouble("p", 0.0),
+                f = o.optDouble("f", 0.0),
+                c = o.optDouble("c", 0.0),
+                foodId = o.optString("id").ifEmpty { null },
+            )
+        }
     }
 
-    fun add(name: String, kcal: Int) {
-        saveToday(todayEntries() + FoodEntry(name, kcal, System.currentTimeMillis()))
+    fun todayEntries() = entries()
+
+    private fun save(list: List<FoodEntry>, date: Date = Date()) {
+        val arr = JSONArray()
+        list.forEach {
+            arr.put(
+                JSONObject().put("name", it.name).put("kcal", it.kcal).put("time", it.time)
+                    .put("meal", it.meal.name).put("g", it.grams).put("p", it.p).put("f", it.f).put("c", it.c)
+                    .put("id", it.foodId ?: ""),
+            )
+        }
+        sp.edit().putString("day_" + dayKey(date), arr.toString()).apply()
     }
+
+    fun add(entry: FoodEntry) = save(todayEntries() + entry)
+
+    /** 前の版との互換用(名前とカロリーだけ) */
+    fun add(name: String, kcal: Int) = add(FoodEntry(name, kcal, System.currentTimeMillis(), Meal.now()))
 
     fun remove(index: Int) {
         val list = todayEntries().toMutableList()
-        if (index in list.indices) { list.removeAt(index); saveToday(list) }
+        if (index in list.indices) { list.removeAt(index); save(list) }
     }
+
+    fun removeByTime(time: Long) = save(todayEntries().filter { it.time != time })
 
     fun todayTotal(): Int = todayEntries().sumOf { it.kcal }
 
-    // ---------- よく食べるもの ----------
+    fun total(date: Date = Date()): DayTotal {
+        val e = entries(date)
+        return DayTotal(e.sumOf { it.kcal }, e.sumOf { it.p }, e.sumOf { it.f }, e.sumOf { it.c })
+    }
 
-    fun presets(): List<FoodPreset> = customPresets() + BUILT_IN.map { FoodPreset(it.first, it.second, false) }
+    /** 最近(7日以内)に食べたもの。新しい順、同じ名前は1つにまとめる */
+    fun recent(limit: Int = 20): List<FoodEntry> {
+        val cal = Calendar.getInstance()
+        val all = ArrayList<FoodEntry>()
+        repeat(7) {
+            all += entries(cal.time)
+            cal.add(Calendar.DAY_OF_YEAR, -1)
+        }
+        return all.sortedByDescending { it.time }.distinctBy { it.name }.take(limit)
+    }
+
+    // ---------- マイ食品 ----------
+
+    fun presets(): List<FoodPreset> = customPresets()
 
     private fun customPresets(): List<FoodPreset> {
         val arr = runCatching { JSONArray(sp.getString("favorites", "[]")) }.getOrElse { JSONArray() }
         return (0 until arr.length()).map {
             val o = arr.getJSONObject(it)
-            FoodPreset(o.getString("name"), o.getInt("kcal"), true)
+            FoodPreset(o.getString("name"), o.getInt("kcal"), true, o.optDouble("p", 0.0), o.optDouble("f", 0.0), o.optDouble("c", 0.0))
         }
     }
 
     private fun saveCustom(list: List<FoodPreset>) {
         val arr = JSONArray()
-        list.forEach { arr.put(JSONObject().put("name", it.name).put("kcal", it.kcal)) }
+        list.forEach { arr.put(JSONObject().put("name", it.name).put("kcal", it.kcal).put("p", it.p).put("f", it.f).put("c", it.c)) }
         sp.edit().putString("favorites", arr.toString()).apply()
     }
 
-    fun addFavorite(name: String, kcal: Int) {
-        saveCustom(listOf(FoodPreset(name, kcal, true)) + customPresets().filter { it.name != name })
+    fun addFavorite(name: String, kcal: Int, p: Double = 0.0, f: Double = 0.0, c: Double = 0.0) {
+        saveCustom(listOf(FoodPreset(name, kcal, true, p, f, c)) + customPresets().filter { it.name != name })
     }
 
     fun removeFavorite(name: String) {
@@ -135,38 +210,19 @@ class CalorieStore(context: Context) {
                 "今日は${total}kcal食べました。あと${left}kcalなので、軽めのものにしましょうね。"
             else ->
                 "今日は${total}kcal食べました。あと${left}kcalですよ、${name}！"
+        } + (pfcAdvice()?.let { "\n$it" } ?: "")
+    }
+
+    /** 栄養バランスのひと言(夕方以降、記録がある時だけ) */
+    fun pfcAdvice(): String? {
+        val t = total()
+        if (t.kcal == 0 || Calendar.getInstance().get(Calendar.HOUR_OF_DAY) < 15) return null
+        return when {
+            t.p < goalP * 0.6 -> "たんぱく質が少なめです。卵や納豆、鶏むね肉なんてどうですか？"
+            t.f > goalF * 1.2 -> "脂質がちょっと多めかも…揚げ物はほどほどにしましょうね。"
+            t.c > goalC * 1.2 -> "炭水化物が多めです。次はおかず中心にしてみましょう！"
+            else -> null
         }
     }
 
-    companion object {
-        /** よくあるメニューのだいたいのカロリー(目安) */
-        val BUILT_IN = listOf(
-            "ごはん(茶碗1杯)" to 250,
-            "おにぎり" to 180,
-            "食パン1枚" to 160,
-            "味噌汁" to 40,
-            "サラダ" to 80,
-            "納豆" to 90,
-            "ゆで卵" to 80,
-            "ヨーグルト" to 60,
-            "バナナ" to 90,
-            "サンドイッチ" to 300,
-            "コンビニ弁当" to 700,
-            "牛丼(並)" to 650,
-            "カレーライス" to 750,
-            "ラーメン" to 550,
-            "うどん" to 350,
-            "パスタ" to 600,
-            "唐揚げ定食" to 900,
-            "ハンバーガー" to 400,
-            "フライドポテト(M)" to 400,
-            "カップ麺" to 350,
-            "ポテトチップス(1袋)" to 330,
-            "チョコ(1枚)" to 280,
-            "アイス" to 200,
-            "缶コーヒー(加糖)" to 70,
-            "コーラ(500ml)" to 225,
-            "ビール(350ml)" to 140,
-        )
-    }
 }

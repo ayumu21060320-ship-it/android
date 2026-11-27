@@ -1,13 +1,11 @@
 package com.mochimate.maid
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.Gravity
-import android.view.inputmethod.InputMethodManager
-import android.widget.Button
-import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -16,14 +14,17 @@ import android.widget.TextView
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
-/** ごはんの記録画面(手入力 + よく食べるものをワンタップ) */
+/** ごはんの記録画面: 今日のリングと PFC、朝・昼・夜・間食ごとの記録 */
 class CalorieActivity : Activity() {
 
     private lateinit var store: CalorieStore
     private lateinit var prefs: Prefs
     private lateinit var mochi: MochiView
     private lateinit var say: TextView
+    private val d by lazy { resources.displayMetrics.density }
+    private fun px(v: Int) = (v * d).toInt()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,119 +34,116 @@ class CalorieActivity : Activity() {
         mochi = findViewById(R.id.mochi)
         say = findViewById(R.id.say)
         mochi.setOnClickListener { mochi.react(); say.text = store.line(prefs.masterName) }
-
-        setupManualInput()
+        findViewById<TextView>(R.id.source).text = FoodDb.SOURCE
         setupProfile()
-        refresh()
         say.text = store.line(prefs.masterName)
     }
 
-    private fun setupManualInput() {
-        val name = findViewById<EditText>(R.id.foodName)
-        val kcal = findViewById<EditText>(R.id.foodKcal)
-        val fav = findViewById<CheckBox>(R.id.saveFavorite)
-        findViewById<Button>(R.id.addFood).setOnClickListener {
-            val n = name.text.toString().trim()
-            val k = kcal.text.toString().toIntOrNull()
-            when {
-                n.isEmpty() -> { say.text = "料理の名前を教えてください！"; name.requestFocus() }
-                k == null || k <= 0 -> { say.text = "カロリーも入れてくださいね。だいたいで大丈夫ですよ！"; kcal.requestFocus() }
-                else -> {
-                    if (fav.isChecked) store.addFavorite(n, k)
-                    record(n, k)
-                    name.setText(""); kcal.setText(""); fav.isChecked = false
-                    getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(name.windowToken, 0)
-                }
-            }
-        }
-    }
-
-    private fun record(name: String, kcal: Int) {
-        store.add(name, kcal)
-        mochi.react()
+    override fun onResume() {
+        super.onResume()
         refresh()
-        say.text = "${name}（${kcal}kcal）を記録しました！\n" + store.line(prefs.masterName)
+        FoodSearchActivity.consumeLastAdded()?.let {
+            mochi.react()
+            say.text = "${it}を記録しました！\n" + store.line(prefs.masterName)
+        }
     }
 
     private fun refresh() {
-        refreshGoalOnly()
-        renderPresets()
-        renderEntries()
+        val t = store.total()
+        findViewById<TextView>(R.id.dateLabel).text = SimpleDateFormat("M月d日(E)", Locale.JAPAN).format(Date()) + " のカロリー"
+        findViewById<RingView>(R.id.ring).set(t.kcal, store.goal)
+        renderPfc(t)
+        renderMeals()
+        refreshGoalText()
     }
 
-    private fun renderPresets() {
-        val box = findViewById<FlowLayout>(R.id.presets)
+    private fun renderPfc(t: DayTotal) {
+        val box = findViewById<LinearLayout>(R.id.pfc)
         box.removeAllViews()
-        val d = resources.displayMetrics.density
-        for (p in store.presets()) {
-            box.addView(TextView(this).apply {
-                text = (if (p.custom) "⭐ " else "") + "${p.name}  ${p.kcal}"
-                textSize = 14f
-                setTextColor(getColor(R.color.ink))
-                setBackgroundResource(if (p.custom) R.drawable.chip_custom_bg else R.drawable.chip_bg)
-                setPadding((12 * d).toInt(), (8 * d).toInt(), (12 * d).toInt(), (8 * d).toInt())
-                setOnClickListener { record(p.name, p.kcal) }
-                if (p.custom) setOnLongClickListener {
-                    store.removeFavorite(p.name)
-                    say.text = "「${p.name}」をよく食べるものから外しました。"
-                    refresh()
-                    true
-                }
-            })
-        }
-    }
-
-    private fun renderEntries() {
-        val box = findViewById<LinearLayout>(R.id.entries)
-        box.removeAllViews()
-        val entries = store.todayEntries()
-        val d = resources.displayMetrics.density
-        if (entries.isEmpty()) {
-            box.addView(TextView(this).apply {
-                text = "まだ何も記録されていません"
-                setTextColor(getColor(R.color.ink_sub))
-                textSize = 14f
-                setPadding(0, (8 * d).toInt(), 0, 0)
-            })
-            return
-        }
-        val fmt = SimpleDateFormat("H:mm", Locale.JAPAN)
-        entries.forEachIndexed { i, e ->
-            val row = LinearLayout(this).apply {
+        fun row(label: String, color: String, value: Double, goal: Double) {
+            val r = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, (6 * d).toInt(), 0, (6 * d).toInt())
+                setPadding(0, px(3), 0, px(3))
             }
-            row.addView(TextView(this).apply {
-                text = fmt.format(Date(e.time))
-                setTextColor(getColor(R.color.ink_sub))
-                textSize = 13f
-                minWidth = (44 * d).toInt()
+            r.addView(TextView(this).apply {
+                text = label; textSize = 13f; setTextColor(getColor(R.color.ink)); minWidth = px(86)
             })
-            row.addView(TextView(this).apply {
-                text = e.name
-                setTextColor(getColor(R.color.ink))
-                textSize = 15f
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            r.addView(ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+                max = 1000
+                progress = if (goal > 0) (value / goal * 1000).toInt().coerceIn(0, 1000) else 0
+                progressDrawable = getDrawable(R.drawable.progress_kcal)?.mutate()
+                progressTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(color))
+            }, LinearLayout.LayoutParams(0, px(10), 1f))
+            r.addView(TextView(this).apply {
+                text = "${value.roundToInt()} / ${goal.roundToInt()} g"
+                textSize = 12f; setTextColor(getColor(R.color.ink_sub)); gravity = Gravity.END; minWidth = px(84)
             })
-            row.addView(TextView(this).apply {
-                text = "${e.kcal} kcal"
-                setTextColor(getColor(R.color.ink))
-                textSize = 15f
+            box.addView(r)
+        }
+        row("たんぱく質", "#E0566E", t.p, store.goalP)
+        row("脂質", "#F2B84B", t.f, store.goalF)
+        row("炭水化物", "#5B9BD5", t.c, store.goalC)
+    }
+
+    private fun renderMeals() {
+        val box = findViewById<LinearLayout>(R.id.meals)
+        box.removeAllViews()
+        val entries = store.todayEntries().withIndex().toList()
+        for (meal in Meal.values()) {
+            val list = entries.filter { it.value.meal == meal }
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundResource(R.drawable.card_bg)
+                setPadding(px(16), px(12), px(16), px(12))
+            }
+            val head = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            head.addView(TextView(this).apply {
+                text = "${meal.emoji} ${meal.label}"
+                textSize = 16f; setTextColor(getColor(R.color.ink)); paint.isFakeBoldText = true
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+            head.addView(TextView(this).apply {
+                text = "${list.sumOf { it.value.kcal }} kcal"
+                textSize = 14f; setTextColor(getColor(R.color.ink_sub))
             })
-            row.addView(TextView(this).apply {
-                text = "✕"
-                setTextColor(getColor(R.color.ink_sub))
-                textSize = 16f
-                setPadding((14 * d).toInt(), (4 * d).toInt(), (4 * d).toInt(), (4 * d).toInt())
-                contentDescription = "${e.name}を消す"
+            head.addView(TextView(this).apply {
+                text = "＋ 追加"
+                textSize = 14f
+                setTextColor(getColor(R.color.accent))
+                paint.isFakeBoldText = true
+                setBackgroundResource(R.drawable.button_sub_bg)
+                setPadding(px(12), px(5), px(12), px(5))
                 setOnClickListener {
-                    store.remove(i)
-                    say.text = "「${e.name}」を消しました。"
-                    refresh()
+                    startActivity(Intent(this@CalorieActivity, FoodSearchActivity::class.java).putExtra(FoodSearchActivity.EXTRA_MEAL, meal.name))
                 }
-            })
-            box.addView(row)
+            }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = px(10) })
+            card.addView(head)
+            for ((i, e) in list) {
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(0, px(6), 0, 0)
+                }
+                row.addView(TextView(this).apply {
+                    text = e.name + if (e.grams > 0) "  ${e.grams.roundToInt()}g" else ""
+                    textSize = 14f; setTextColor(getColor(R.color.ink))
+                }, LinearLayout.LayoutParams(0, -2, 1f))
+                row.addView(TextView(this).apply {
+                    text = "${e.kcal} kcal"; textSize = 14f; setTextColor(getColor(R.color.ink))
+                })
+                row.addView(TextView(this).apply {
+                    text = "✕"; textSize = 15f; setTextColor(getColor(R.color.ink_sub))
+                    setPadding(px(12), px(2), px(2), px(2))
+                    contentDescription = "${e.name}を消す"
+                    setOnClickListener {
+                        store.remove(i)
+                        say.text = "「${e.name}」を消しました。"
+                        refresh()
+                    }
+                })
+                card.addView(row)
+            }
+            box.addView(card, LinearLayout.LayoutParams(-1, -2).apply { topMargin = px(12) })
         }
     }
 
@@ -183,23 +181,18 @@ class CalorieActivity : Activity() {
                 override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
                 override fun afterTextChanged(s: Editable?) {
                     onValid(s?.toString().orEmpty())
-                    refreshGoalOnly()
+                    val t = store.total()
+                    findViewById<RingView>(R.id.ring).set(t.kcal, store.goal)
+                    renderPfc(t)
+                    refreshGoalText()
                 }
             })
         }
     }
 
-    /** 数字の入力中はリスト全体を作り直さず、目標の表示だけ更新する */
-    private fun refreshGoalOnly() {
-        val total = store.todayTotal()
-        val goal = store.goal
-        findViewById<TextView>(R.id.total).text = "$total / ${goal} kcal"
-        findViewById<ProgressBar>(R.id.progress).progress =
-            if (goal > 0) (total * 1000 / goal).coerceIn(0, 1000) else 0
-        val left = goal - total
-        findViewById<TextView>(R.id.left).text =
-            if (left >= 0) "あと ${left} kcal" else "${-left} kcal オーバー"
+    private fun refreshGoalText() {
         findViewById<TextView>(R.id.goalText).text =
-            "1日の目標: ${goal} kcal（基礎代謝 ${store.bmr.toInt()} kcal）"
+            "1日の目標: ${store.goal} kcal（基礎代謝 ${store.bmr.toInt()} kcal）\n" +
+            "たんぱく質 ${store.goalP.roundToInt()}g・脂質 ${store.goalF.roundToInt()}g・炭水化物 ${store.goalC.roundToInt()}g"
     }
 }

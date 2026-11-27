@@ -56,6 +56,12 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".FoodSearchActivity"
+            android:exported="false"
+            android:label="食べたものを追加"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".MoneyActivity"
             android:exported="false"
             android:label="家計簿"
