@@ -80,6 +80,15 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("home_last_in", true)
         set(v) = sp.edit().putBoolean("home_last_in", v).apply()
 
+    /** 家の Wi-Fi の名前(未設定なら null) */
+    var homeWifi: String?
+        get() = sp.getString("home_wifi", null)
+        set(v) = sp.edit().putString("home_wifi", v).apply()
+
+    var lastHomeSource: String
+        get() = sp.getString("home_last_src", "gps")!!
+        set(v) = sp.edit().putString("home_last_src", v).apply()
+
     var lastHomeEventAt: Long
         get() = sp.getLong("home_last_at", 0L)
         set(v) = sp.edit().putLong("home_last_at", v).apply()

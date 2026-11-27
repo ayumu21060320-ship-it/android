@@ -27,6 +27,7 @@ object HomeGeofence {
     private const val ID = "home"
     private const val CHANNEL = "mochi_home"
     private const val COOLDOWN_MS = 15 * 60 * 1000L
+    private const val SAME_STATE_MS = 3 * 60 * 60 * 1000L
 
     fun hasForeground(c: Context) =
         c.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -85,15 +86,23 @@ object HomeGeofence {
     }
 
     /** おうちに着いた/出た時の処理(テストボタンからも呼ぶ) */
-    fun onTransition(c: Context, entered: Boolean, test: Boolean = false) {
+    /**
+     * @param source "wifi"(家の Wi-Fi)か "gps"(位置情報)。Wi-Fi のほうが速くて確実なので、
+     *   Wi-Fi で判定したあとに遅れて届いた位置情報の判定は無視する。
+     */
+    fun onTransition(c: Context, entered: Boolean, test: Boolean = false, source: String = "gps") {
         val p = Prefs(c)
-        // GPS のぶれで出たり入ったりした時に、何度も言わないようにする
         val now = System.currentTimeMillis()
         if (!test) {
-            if (entered == p.lastHomeEntered && now - p.lastHomeEventAt < COOLDOWN_MS) return
-            if (now - p.lastHomeEventAt < 60_000) return
+            // 同じ「家にいる/いない」が続けて来たら言わない(Wi-Fi のあとの GPS や、GPS のぶれ)
+            if (entered == p.lastHomeEntered && now - p.lastHomeEventAt < SAME_STATE_MS) return
+            // GPS は短い間の行ったり来たりを無視する。Wi-Fi はすぐ反応してよい
+            if (source == "gps" && now - p.lastHomeEventAt < COOLDOWN_MS && entered != p.lastHomeEntered &&
+                p.lastHomeSource == "gps"
+            ) return
             p.lastHomeEntered = entered
             p.lastHomeEventAt = now
+            p.lastHomeSource = source
         }
         if (!entered && !p.homeSayGoodbye) return
 
@@ -101,9 +110,15 @@ object HomeGeofence {
             val line = MochiLines.welcomeHome(p.masterName, MoneyStore(c).todayTotal().takeIf { p.careMoney })
             deliver(c, line, "🏠 おかえりなさいませ")
         } else {
-            // いってらっしゃい: 天気がわかれば傘のことも言う
-            WeatherRepository.today(p) { w ->
-                deliver(c, MochiLines.goodbye(p.masterName, w), "🚪 いってらっしゃいませ")
+            // いってらっしゃい: 天気がわかれば傘のことも言う。
+            // 外に出るとネットが使えないことがあるので、家にいる間に取っておいた今日の天気を使う
+            val cached = WeatherRepository.cachedToday(p)
+            if (cached != null) {
+                deliver(c, MochiLines.goodbye(p.masterName, cached), "🚪 いってらっしゃいませ")
+            } else {
+                WeatherRepository.today(p) { w ->
+                    deliver(c, MochiLines.goodbye(p.masterName, w), "🚪 いってらっしゃいませ")
+                }
             }
         }
     }

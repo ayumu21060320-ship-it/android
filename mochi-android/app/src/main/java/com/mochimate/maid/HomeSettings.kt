@@ -58,7 +58,8 @@ class HomeSettings(private val activity: Activity, private val card: LinearLayou
         }
         body.addView(bgButton, lp())
 
-        body.addView(button("📍 今いる場所をおうちにする") { setHomeHere() }, lp())
+        body.addView(button("📶 今つながっている Wi-Fi をおうちにする（おすすめ・すぐ反応）") { setWifiHere() }, lp())
+        body.addView(button("📍 今いる場所もおうちにする（予備・Wi-Fi がない時用）") { setHomeHere() }, lp())
 
         body.addView(TextView(activity).apply {
             text = "おうちとみなす範囲"
@@ -106,11 +107,13 @@ class HomeSettings(private val activity: Activity, private val card: LinearLayou
         val fg = HomeGeofence.hasForeground(activity)
         val bg = HomeGeofence.hasBackground(activity)
         bgButton.visibility = if (fg && !bg) View.VISIBLE else View.GONE
+        val wifiLine = prefs.homeWifi?.let { "📶 おうちの Wi-Fi：$it" } ?: "📶 おうちの Wi-Fi：まだ登録していません"
+        val gpsLine = if (prefs.homeLat != null) "📍 おうちの場所：登録済み（範囲 ${prefs.homeRadius}m）" else "📍 おうちの場所：まだ登録していません"
         status.text = when {
-            !fg -> "⚠️ 位置情報の許可がまだです"
-            !bg -> "⚠️ アプリを閉じている時も判定するために、位置情報を「常に許可」にしてください（ボタンを押すと設定が開きます）"
-            prefs.homeLat == null -> "おうちにいる時に「今いる場所をおうちにする」を押してね"
-            else -> "✅ おうちを見守っています（範囲 ${prefs.homeRadius}m）"
+            !fg -> "⚠️ 位置情報の許可がまだです（Wi-Fi の名前を知るのにも必要です）"
+            !bg -> "⚠️ メイドさんが裏にいる時も判定するために、位置情報を「常に許可」にしてください（ボタンを押すと設定が開きます）"
+            prefs.homeWifi == null && prefs.homeLat == null -> "おうちにいる時に、下のボタンでおうちを登録してね"
+            else -> "✅ おうちを見守っています\n$wifiLine\n$gpsLine"
         }
         for ((r, chip) in radiusChips) {
             chip.setBackgroundResource(if (r == prefs.homeRadius) R.drawable.chip_custom_bg else R.drawable.chip_bg)
@@ -122,6 +125,28 @@ class HomeSettings(private val activity: Activity, private val card: LinearLayou
             HomeGeofence.register(activity)
             refresh()
         }
+    }
+
+    private fun setWifiHere() {
+        if (!HomeGeofence.hasForeground(activity)) {
+            activity.requestPermissions(
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                REQ_LOCATION,
+            )
+            return
+        }
+        val ssid = HomeWifiWatcher.currentSsid(activity)
+        if (ssid == null) {
+            status.text = "⚠️ Wi-Fi の名前がわかりませんでした。家の Wi-Fi につながっていて、位置情報がオンになっているか確かめてね"
+            return
+        }
+        prefs.homeWifi = ssid
+        prefs.lastHomeEntered = true // 今は家にいるので、登録した瞬間に「おかえり」とは言わない
+        prefs.lastHomeEventAt = System.currentTimeMillis()
+        prefs.lastHomeSource = "wifi"
+        OverlayService.restartHomeWifi()
+        refresh()
+        status.text = "✅ 「$ssid」をおうちの Wi-Fi にしました！\nこの Wi-Fi が切れたら「いってらっしゃい」、つながったら「おかえり」を言います。"
     }
 
     private fun setHomeHere() {

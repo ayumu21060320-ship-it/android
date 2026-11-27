@@ -53,6 +53,7 @@ class OverlayService : Service() {
 
     private val hideBubble = Runnable { setBubbleVisible(false) }
     private var card: NotifyCard? = null
+    private var homeWifi: HomeWifiWatcher? = null
 
     // ボタンやチップ付きの吹き出し(支払い・アラーム・通知)
     private var rich: BubbleFrame? = null
@@ -97,6 +98,7 @@ class OverlayService : Service() {
         if (instance === this) instance = null
         runCatching { unregisterReceiver(batteryReceiver) }
         runCatching { unregisterReceiver(screenReceiver) }
+        homeWifi?.stop()
         card?.dismiss()
         dismissRich(resume = false)
         stopFling(save = true)
@@ -200,6 +202,7 @@ class OverlayService : Service() {
         }
         registerReceiver(batteryReceiver, filter)
         registerReceiver(screenReceiver, IntentFilter(Intent.ACTION_SCREEN_ON))
+        homeWifi = HomeWifiWatcher(this).also { it.start() }
 
         // 登場のあいさつ。天気のお世話を選んでいれば、続けて今日の天気も伝える。
         handler.postDelayed({ talk(MochiLines.greeting(prefs.masterName)) }, 400)
@@ -716,6 +719,15 @@ class OverlayService : Service() {
             s.handler.post {
                 if (s.richSpec?.tag == tag) s.dismissRich()
                 if (s.card?.tag == tag) s.card?.dismiss()
+            }
+        }
+
+        /** 家の Wi-Fi の設定が変わった時に、見張りをやり直す */
+        fun restartHomeWifi() {
+            val s = instance ?: return
+            s.handler.post {
+                s.homeWifi?.stop()
+                s.homeWifi = HomeWifiWatcher(s).also { it.start() }
             }
         }
 

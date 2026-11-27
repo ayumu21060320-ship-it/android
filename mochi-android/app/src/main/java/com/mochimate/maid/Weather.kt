@@ -72,6 +72,14 @@ object WeatherRepository {
         }
     }
 
+    /** 今日取った天気が残っていれば、ネットを使わずに返す(外出中など) */
+    fun cachedToday(prefs: Prefs): Weather? {
+        val (savedAt, json) = prefs.weatherCache ?: return null
+        val day = java.text.SimpleDateFormat("yyyyMMdd", Locale.US)
+        if (day.format(java.util.Date(savedAt)) != day.format(java.util.Date())) return null
+        return parseWeather(json)
+    }
+
     /** 街の名前から場所を探す(日本語OK)。失敗したら空のリスト。 */
     fun searchCity(query: String, callback: (List<City>) -> Unit) {
         io.execute {
