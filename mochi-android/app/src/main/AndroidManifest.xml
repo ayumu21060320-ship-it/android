@@ -3,6 +3,9 @@
 
     <!-- 天気を調べるための通信 -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 家の Wi-Fi につながった・切れたを知るため -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <!-- ホーム画面の上にもちもちを表示するための権限 -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- アプリを閉じても、もちもちが消されないようにするための権限 -->

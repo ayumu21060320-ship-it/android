@@ -31,7 +31,7 @@ class HomeWifiWatcher(private val context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) FLAG_INCLUDE_LOCATION_INFO else 0,
     ) {
         override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-            val ssid = ssidFrom(caps) ?: return
+            val ssid = runCatching { ssidFrom(caps) }.getOrNull() ?: return
             val first = ssidOf.put(network, ssid) == null
             if (first && isHome(ssid)) main.post {
                 // 家の Wi-Fi にいる間に天気を取っておく(外ではネットが使えないため)
@@ -77,7 +77,9 @@ class HomeWifiWatcher(private val context: Context) {
 
     companion object {
         /** 今つながっている Wi-Fi の名前(わからなければ null) */
-        fun currentSsid(context: Context): String? {
+        fun currentSsid(context: Context): String? = runCatching { readSsid(context) }.getOrNull()
+
+        private fun readSsid(context: Context): String? {
             val cm = context.getSystemService(ConnectivityManager::class.java)
             val caps = cm.getNetworkCapabilities(cm.activeNetwork)
             val fromCaps = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) (caps?.transportInfo as? WifiInfo)?.ssid else null
