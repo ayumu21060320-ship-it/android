@@ -71,6 +71,8 @@ class IntegrationActivity : Activity() {
         // --- オプション ---
         val opt = card()
         opt.addView(title("お知らせのしかた"))
+        opt.addView(check("🧹 メイドさんが知らせたら、元のアプリの通知は消す", prefs.takeOver) { prefs.takeOver = it })
+        opt.addView(sub("音やポップアップまで止めたい時は、下の一覧の 🔕 からそのアプリの通知を「サイレント」にしてね。"))
         opt.addView(check("🪟 吹き出しではなく、画面の上にカードで出す", prefs.cardAtTop) { prefs.cardAtTop = it })
         opt.addView(check("通知の本文も教えてもらう（オフなら「誰から」だけ）", prefs.announceBody) { prefs.announceBody = it })
         opt.addView(check("🔋 電池が少なくなったら教えてもらう", prefs.batteryTalk) { prefs.batteryTalk = it })
@@ -124,10 +126,17 @@ class IntegrationActivity : Activity() {
             }
         }, LinearLayout.LayoutParams(-1, px(44)).apply { topMargin = px(8) })
 
+        opt.addView(Button(this).apply {
+            text = "📜 通知の履歴を見る"
+            setTextColor(getColor(R.color.accent))
+            setBackgroundResource(R.drawable.button_sub_bg)
+            setOnClickListener { startActivity(Intent(this@IntegrationActivity, HistoryActivity::class.java)) }
+        }, LinearLayout.LayoutParams(-1, px(44)).apply { topMargin = px(8) })
+
         // --- アプリごとの設定 ---
         val apps = card()
         apps.addView(title("アプリごとの設定"))
-        apps.addView(sub("🔔 … 通知を教えてもらう　💰 … 支払い通知を家計簿に自動記録\n支払いアプリっぽいものを上に並べています。"))
+        apps.addView(sub("🔔 … メイドさんが通知を教えてくれる\n💰 … 支払い通知を家計簿に自動記録\n🔕 … そのアプリの通知設定を開く（サイレントにする用）\n💬 のアプリは、送り主の名前も中身も読まず「LINEが来ましたよ」だけ伝えます。"))
         appList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         apps.addView(appList)
         appList.addView(sub("アプリを読み込んでいます…"))
@@ -143,7 +152,7 @@ class IntegrationActivity : Activity() {
         grant.text = if (granted) "通知へのアクセスの設定を開く" else "通知へのアクセスを許可する"
     }
 
-    private data class AppRow(val pkg: String, val label: String, val info: ResolveInfo, val payLike: Boolean)
+    private data class AppRow(val pkg: String, val label: String, val info: ResolveInfo, val payLike: Boolean, val clockLike: Boolean)
 
     private fun loadApps() {
         val main = Handler(Looper.getMainLooper())
@@ -156,10 +165,13 @@ class IntegrationActivity : Activity() {
                 .distinctBy { it.activityInfo.packageName }
                 .map {
                     val label = it.loadLabel(pm).toString()
-                    AppRow(it.activityInfo.packageName, label, it, PAY_LIKE.containsMatchIn(label) || PAY_LIKE.containsMatchIn(it.activityInfo.packageName))
+                    val pkg = it.activityInfo.packageName
+                    AppRow(pkg, label, it, PAY_LIKE.containsMatchIn(label) || PAY_LIKE.containsMatchIn(pkg),
+                        CLOCK_LIKE.containsMatchIn(label) || CLOCK_LIKE.containsMatchIn(pkg))
                 }
                 .sortedWith(compareByDescending<AppRow> { it.pkg in prefs.paymentApps || it.pkg in prefs.announceApps }
                     .thenByDescending { it.payLike }
+                    .thenByDescending { it.clockLike }
                     .thenBy { it.label })
             main.post { renderApps(rows) }
         }
@@ -176,7 +188,7 @@ class IntegrationActivity : Activity() {
             }
             row.addView(ImageView(this).apply { setImageDrawable(r.info.loadIcon(pm)) }, LinearLayout.LayoutParams(px(32), px(32)))
             row.addView(TextView(this).apply {
-                text = r.label
+                text = (if (MochiNotificationListener.isPrivateApp(r.pkg)) "💬 " else "") + r.label
                 textSize = 15f
                 setTextColor(getColor(R.color.ink))
                 setPadding(px(10), 0, 0, 0)
@@ -187,6 +199,15 @@ class IntegrationActivity : Activity() {
             row.addView(smallCheck("💰", r.pkg in prefs.paymentApps) { on ->
                 prefs.paymentApps = if (on) prefs.paymentApps + r.pkg else prefs.paymentApps - r.pkg
                 if (on && !prefs.careMoney) prefs.careMoney = true
+            })
+            row.addView(TextView(this).apply {
+                text = "🔕"
+                textSize = 18f
+                setPadding(px(8), px(6), px(2), px(6))
+                contentDescription = "${r.label}の通知設定を開く"
+                setOnClickListener {
+                    startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, r.pkg))
+                }
             })
             appList.addView(row)
         }
@@ -226,6 +247,7 @@ class IntegrationActivity : Activity() {
     }
 
     companion object {
+        private val CLOCK_LIKE = Regex("clock|時計|アラーム|alarm", RegexOption.IGNORE_CASE)
         private val PAY_LIKE = Regex("pay|ペイ|払い|wallet|ウォレット|銀行|bank|カード|card|suica|pasmo|楽天|PayPay|メルペイ|クレジット", RegexOption.IGNORE_CASE)
     }
 }

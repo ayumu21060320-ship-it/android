@@ -37,6 +37,11 @@ class Prefs(context: Context) {
         get() = sp.getStringSet("payment_apps", emptySet())!!.toSet()
         set(v) = sp.edit().putStringSet("payment_apps", v).apply()
 
+    /** メイドさんが知らせたら、元のアプリの通知は通知バーから消すか */
+    var takeOver: Boolean
+        get() = sp.getBoolean("take_over", true)
+        set(v) = sp.edit().putBoolean("take_over", v).apply()
+
     /** お知らせを、吹き出しではなく画面の上のカードで出すか */
     var cardAtTop: Boolean
         get() = sp.getBoolean("card_at_top", false)

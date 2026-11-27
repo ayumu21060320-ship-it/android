@@ -51,6 +51,11 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".HistoryActivity"
+            android:exported="false"
+            android:label="通知の履歴" />
+
+        <activity
             android:name=".IntegrationActivity"
             android:exported="false"
             android:label="連携" />

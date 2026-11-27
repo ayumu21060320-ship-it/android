@@ -55,51 +55,47 @@ object CardContent {
         val sub = context.getColor(R.color.ink_sub)
         val root = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
 
+        // 上の段: 大きなアプリのアイコン | アプリ名・セリフ・タイトル・本文 | ✕
+        val top = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.TOP
+        }
+        if (spec.icon != null) {
+            top.addView(ImageView(context).apply {
+                setImageDrawable(spec.icon)
+                contentDescription = spec.appLabel
+            }, LinearLayout.LayoutParams(px(44), px(44)).apply { marginEnd = px(10) })
+        }
+        val texts = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        texts.addView(TextView(context).apply {
+            text = spec.appLabel
+            textSize = 12f
+            setTextColor(sub)
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+        })
         if (spec.header != null) {
-            root.addView(TextView(context).apply {
+            texts.addView(TextView(context).apply {
                 text = spec.header
                 textSize = 15f
                 setTextColor(ink)
                 setLineSpacing(0f, 1.15f)
-                setPadding(0, 0, 0, px(8))
+                setPadding(0, px(2), 0, 0)
             })
         }
-
-        // アイコン・アプリ名・✕
-        val head = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+        if (spec.title.isNotBlank()) {
+            texts.addView(TextView(context).apply {
+                text = spec.title
+                textSize = 18f
+                setTextColor(ink)
+                paint.isFakeBoldText = true
+                maxLines = 2
+                ellipsize = TextUtils.TruncateAt.END
+                setPadding(0, px(4), 0, 0)
+            })
         }
-        head.addView(ImageView(context).apply { setImageDrawable(spec.icon) }, LinearLayout.LayoutParams(px(20), px(20)))
-        head.addView(TextView(context).apply {
-            text = spec.appLabel
-            textSize = 12f
-            setTextColor(sub)
-            setPadding(px(6), 0, 0, 0)
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-        }, LinearLayout.LayoutParams(0, -2, 1f))
-        head.addView(TextView(context).apply {
-            text = "✕"
-            textSize = 15f
-            setTextColor(sub)
-            setPadding(px(10), px(2), px(2), px(2))
-            contentDescription = "閉じる"
-            setOnClickListener { onClose() }
-        })
-        root.addView(head)
-
-        root.addView(TextView(context).apply {
-            text = spec.title
-            textSize = 18f
-            setTextColor(ink)
-            paint.isFakeBoldText = true
-            maxLines = 2
-            ellipsize = TextUtils.TruncateAt.END
-            setPadding(0, px(4), 0, 0)
-        })
         if (!spec.body.isNullOrBlank()) {
-            root.addView(TextView(context).apply {
+            texts.addView(TextView(context).apply {
                 text = spec.body
                 textSize = 14f
                 setTextColor(sub)
@@ -108,6 +104,16 @@ object CardContent {
                 setPadding(0, px(2), 0, 0)
             })
         }
+        top.addView(texts, LinearLayout.LayoutParams(0, -2, 1f))
+        top.addView(TextView(context).apply {
+            text = "✕"
+            textSize = 15f
+            setTextColor(sub)
+            setPadding(px(10), 0, px(2), px(4))
+            contentDescription = "閉じる"
+            setOnClickListener { onClose() }
+        })
+        root.addView(top)
 
         if (spec.chips != null) {
             val flow = FlowLayout(context).apply { setPadding(0, px(8), 0, 0) }

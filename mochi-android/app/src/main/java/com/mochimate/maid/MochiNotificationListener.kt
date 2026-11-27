@@ -20,6 +20,8 @@ class MochiNotificationListener : NotificationListenerService() {
     private val lastAnnounce = HashMap<String, Long>()
     /** もう教えた通知(更新されても2回目は教えない) */
     private val seenKeys = HashSet<String>()
+    /** メイドさんが代わりに知らせて、自分で消した通知 */
+    private val selfCancelled = HashSet<String>()
 
     override fun onCreate() {
         super.onCreate()
@@ -50,7 +52,7 @@ class MochiNotificationListener : NotificationListenerService() {
                     val time = System.currentTimeMillis()
                     val category = MoneyStore.guessCategory(pay.store)
                     money.add(MoneyEntry(pay.amount, category, pay.store ?: label, time, label))
-                    OverlayService.showCard(
+                    val shown = OverlayService.showCard(
                         CardSpec(
                             icon = appIcon(pkg),
                             appLabel = label,
@@ -66,6 +68,8 @@ class MochiNotificationListener : NotificationListenerService() {
                             },
                         ),
                     )
+                    history(pkg, label, "pay", "${MoneyStore.yen(pay.amount)}${pay.store?.let { "・$it" } ?: ""}")
+                    if (shown) takeOver(sbn)
                 }
                 return
             }
@@ -86,6 +90,7 @@ class MochiNotificationListener : NotificationListenerService() {
                     else -> null
                 }
             }.distinctBy { it.first }
+            history(pkg, label, "alarm", title?.takeIf { it.isNotBlank() } ?: "アラーム")
             OverlayService.showCard(
                 CardSpec(
                     icon = appIcon(pkg),
@@ -106,23 +111,42 @@ class MochiNotificationListener : NotificationListenerService() {
         val now = System.currentTimeMillis()
         if (now - (lastAnnounce[pkg] ?: 0L) < 8_000) return
         lastAnnounce[pkg] = now
-        val who = title?.takeIf { it.isNotBlank() }
-        val body = text?.replace('\n', ' ')?.let { if (it.length > 60) it.take(60) + "…" else it }
-        OverlayService.showCard(
+        // メッセージ・メール・SNS は、送り主の名前も中身も読まない(アプリ名だけ)
+        val private = isPrivateApp(pkg)
+        val who = if (private) null else title?.takeIf { it.isNotBlank() }
+        val body = if (private || !prefs.announceBody) null
+        else text?.replace('\n', ' ')?.let { if (it.length > 60) it.take(60) + "…" else it }
+        val shown = OverlayService.showCard(
             CardSpec(
                 icon = appIcon(pkg),
                 appLabel = label,
-                header = "${label}から通知が来ましたよ！",
-                title = who ?: label,
-                body = if (prefs.announceBody) body else null,
+                header = if (private) "${label}が来ましたよ！" else "${label}から通知が来ましたよ！",
+                title = who ?: "",
+                body = body,
                 onOpen = n.contentIntent?.let { pi -> { sendIntent(pi) } },
                 tag = sbn.key,
             ),
         )
+        history(pkg, label, "notify", who)
+        if (shown) takeOver(sbn)
+    }
+
+    /** メイドさんが知らせたので、元の通知は通知バーから消す(設定でオンの時だけ) */
+    private fun takeOver(sbn: StatusBarNotification) {
+        if (!prefs.takeOver || !sbn.isClearable) return
+        if (sbn.packageName == packageName) return
+        selfCancelled.add(sbn.key)
+        runCatching { cancelNotification(sbn.key) }
+    }
+
+    private fun history(pkg: String, label: String, kind: String, title: String?) {
+        NotifyHistory(this).add(HistoryItem(System.currentTimeMillis(), pkg, label, kind, title))
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         seenKeys.remove(sbn.key)
+        // メイドさんが自分で消した時は、吹き出しはそのまま残す
+        if (selfCancelled.remove(sbn.key)) return
         OverlayService.dismissTag(sbn.key)
     }
 
@@ -143,6 +167,15 @@ class MochiNotificationListener : NotificationListenerService() {
         const val EXTRA_TEST = "com.mochimate.maid.TEST_PAYMENT"
         private val STOP = Regex("解除|停止|止める|オフ|閉じる|dismiss|stop|turn off", RegexOption.IGNORE_CASE)
         private val SNOOZE = Regex("スヌーズ|snooze|後で", RegexOption.IGNORE_CASE)
+
+        /** メッセージ・メール・SNS など、他人の個人情報が入りやすいアプリ */
+        private val PRIVATE = Regex(
+            "jp\\.naver\\.line|com\\.linecorp|messag|messenger|\\.orca|whatsapp|telegram|discord|slack|kakao|" +
+                "instagram|twitter|com\\.x\\.|facebook|threads|tiktok|snapchat|mail|\\.gm$|outlook|skype|teams|zoom|chatwork|signal",
+            RegexOption.IGNORE_CASE,
+        )
+
+        fun isPrivateApp(pkg: String) = PRIVATE.containsMatchIn(pkg)
         private const val TEST_CHANNEL = "mochi_test"
 
         /** 支払いアプリのふりをした通知を出す(サブ機で連携を確かめる用) */

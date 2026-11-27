@@ -632,8 +632,8 @@ class OverlayService : Service() {
 
         /** ホーム画面に小さなカードを出して、メイドさんにもひと言しゃべってもらう */
         /** お知らせを出す。ふだんはメイドさんの吹き出しで、設定によっては画面の上のカードで。 */
-        fun showCard(spec: CardSpec) {
-            val s = instance ?: return
+        fun showCard(spec: CardSpec): Boolean {
+            val s = instance ?: return false
             s.handler.post {
                 if (s.prefs.cardAtTop) {
                     val c = s.card ?: NotifyCard(s, s.wm).also { s.card = it }
@@ -643,6 +643,7 @@ class OverlayService : Service() {
                     s.showRich(spec)
                 }
             }
+            return true
         }
 
         /** 元の通知が消えた時(アラームを止めた時など)に、お知らせも消す */
