@@ -475,6 +475,14 @@ class OverlayService : Service() {
             if (prefs.careWeight) add { talkWith(WeightStore(this@OverlayService).line(name), BubbleVisuals::weight) }
             if (prefs.careCondition) add { talkCondition() }
             if (prefs.careMoney) add { talkWith(MoneyStore(this@OverlayService).line(name), BubbleVisuals::money) }
+            if (prefs.careSchedule) {
+                val next = ScheduleStore(this@OverlayService).upcoming().firstOrNull { it.date == java.time.LocalDate.now() }
+                if (next != null) add { talk("今日は${next.timeText()}から「${next.title}」がありますよ！") }
+            }
+            if (prefs.careTodo) {
+                val left = TodoStore(this@OverlayService).today().filter { !it.done }
+                if (left.isNotEmpty()) add { talk("今日のやること、あと${left.size}つです。「${left.first().text}」からいきましょ！") }
+            }
         }
         val i = (talkCount - 1) % (topics.size + 1)
         when {
@@ -600,6 +608,19 @@ class OverlayService : Service() {
             val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(now.time)
             val hour = now.get(java.util.Calendar.HOUR_OF_DAY)
             if (FocusService.running) { handler.postDelayed(this, 10 * 60_000); return }
+            // スマホの使いすぎ
+            // (メイドさんが隠れている時は、通知で知らせる)
+            ScreenTime.check(this@OverlayService)
+            // 夜8時をすぎてやることが残っていたら、1日1回だけ声をかける
+            val todo = TodoStore(this@OverlayService)
+            val todayStr = java.time.LocalDate.now().toString()
+            if (prefs.careTodo && hour >= 20 && todo.lastNudge != todayStr && rich == null) {
+                val left = todo.today().filter { !it.done }
+                if (left.isNotEmpty()) {
+                    todo.lastNudge = todayStr
+                    talk("${prefs.masterName}、今日のやること、まだ${left.size}つ残ってますよ〜\n「${left.first().text}」とか…できそうですか？")
+                }
+            }
             // 朝(6〜11時)に1回、今日の調子を聞く
             if (prefs.careCondition && hour in 6..11 && prefs.lastConditionAsk != today && rich == null &&
                 ConditionStore(this@OverlayService).get().body == null

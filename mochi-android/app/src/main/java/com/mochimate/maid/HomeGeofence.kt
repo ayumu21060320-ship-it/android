@@ -165,6 +165,7 @@ class HomeBootReceiver : BroadcastReceiver() {
             Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> {
                 HomeGeofence.register(context)
                 GarbageAlarm.schedule(context)
+                ScheduleAlarm.schedule(context)
             }
         }
     }

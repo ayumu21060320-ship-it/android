@@ -152,8 +152,11 @@ class HomeTab(a: Activity, private val goSettings: () -> Unit) : TabUi(a) {
             if (prefs.careWeight) add(::weightTile)
             if (prefs.careCondition) add(::conditionTile)
             if (prefs.careMoney) add(::moneyTile)
+            if (prefs.careSchedule) add(::scheduleTile)
+            if (prefs.careTodo) add(::todoTile)
             if (prefs.careGarbage) add(::garbageTile)
             if (prefs.careFocus) add(::focusTile)
+            if (prefs.careScreenTime) add(::screenTile)
         }
         if (tiles.isEmpty()) {
             card(col).apply {
@@ -244,6 +247,59 @@ class HomeTab(a: Activity, private val goSettings: () -> Unit) : TabUi(a) {
         c.addView(text("気分 ${ConditionStore.face(t.mood)}", 22f))
     }
 
+    private fun scheduleTile(c: LinearLayout) {
+        val s = ScheduleStore(a)
+        c.setOnClickListener { open(ScheduleActivity::class.java) }
+        header(c, "📅 予定", "›")
+        val up = s.upcoming().take(3)
+        if (up.isEmpty()) {
+            c.addView(text("これからの予定はありません", 13f, sub).apply { setPadding(0, px(6), 0, 0) })
+            c.addView(text("＋ 追加", 13f, a.getColor(R.color.accent), bold = true).apply { setPadding(0, px(8), 0, 0) })
+            return
+        }
+        up.forEach { p ->
+            val day = when (p.date) {
+                LocalDate.now() -> "今日"
+                LocalDate.now().plusDays(1) -> "明日"
+                else -> "${p.date.monthValue}/${p.date.dayOfMonth}"
+            }
+            c.addView(text("$day ${p.timeText()}", 11f, sub).apply { setPadding(0, px(6), 0, 0) })
+            c.addView(text(p.title, 14f, bold = true).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+        }
+    }
+
+    private fun todoTile(c: LinearLayout) {
+        val items = TodoStore(a).today()
+        c.setOnClickListener { open(TodoActivity::class.java) }
+        val left = items.count { !it.done }
+        header(c, "✅ やること", "›")
+        if (items.isEmpty()) {
+            c.addView(text("今日のやることを書いておこう", 13f, sub).apply { setPadding(0, px(6), 0, 0) })
+            return
+        }
+        c.addView(big(left.toString(), "つ残り"))
+        items.filter { !it.done }.take(3).forEach {
+            c.addView(text("・${it.text}", 13f).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+        }
+        if (left == 0) c.addView(text("全部おわり！🎉", 13f, a.getColor(R.color.accent), bold = true))
+    }
+
+    private fun screenTile(c: LinearLayout) {
+        c.setOnClickListener { open(ScreenTimeActivity::class.java) }
+        header(c, "📱 スマホ時間", "›")
+        if (!ScreenTime.granted(a)) {
+            c.addView(text("タップして「使用状況へのアクセス」を許可してね", 13f, sub).apply { setPadding(0, px(6), 0, 0) })
+            return
+        }
+        val usage = ScreenTime.today(a)
+        val total = usage.sumOf { it.second }
+        c.addView(text("今日", 12f, sub).apply { setPadding(0, px(6), 0, 0) })
+        c.addView(text(ScreenTime.hm(total), 22f, bold = true))
+        usage.take(2).forEach { (pkg, ms) ->
+            c.addView(text("${ScreenTime.label(a, pkg)} ${ScreenTime.hm(ms)}", 12f, sub).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+        }
+    }
+
     private fun garbageTile(c: LinearLayout) {
         val g = GarbageStore(a)
         c.setOnClickListener { open(GarbageActivity::class.java) }
@@ -314,6 +370,9 @@ class HomeTab(a: Activity, private val goSettings: () -> Unit) : TabUi(a) {
             Triple("💰 お金", prefs.careMoney) { prefs.careMoney = !prefs.careMoney; refresh() },
             Triple("🗑️ ゴミの日", prefs.careGarbage) { prefs.careGarbage = !prefs.careGarbage; GarbageAlarm.schedule(a); refresh() },
             Triple("⏱️ 集中", prefs.careFocus) { prefs.careFocus = !prefs.careFocus; refresh() },
+            Triple("📅 予定", prefs.careSchedule) { prefs.careSchedule = !prefs.careSchedule; refresh() },
+            Triple("✅ やること", prefs.careTodo) { prefs.careTodo = !prefs.careTodo; refresh() },
+            Triple("📱 スマホ時間", prefs.careScreenTime) { prefs.careScreenTime = !prefs.careScreenTime; refresh() },
         ))
         group("🧹 メイドさんのお仕事", "🏠と🔔は設定が開きます", listOf(
             Triple("🏠 おかえり", prefs.homeEnabled) { goSettings() },

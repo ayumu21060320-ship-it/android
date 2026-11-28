@@ -43,6 +43,21 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("care_focus", true)
         set(value) = sp.edit().putBoolean("care_focus", value).apply()
 
+    /** やることリスト */
+    var careTodo: Boolean
+        get() = sp.getBoolean("care_todo", true)
+        set(value) = sp.edit().putBoolean("care_todo", value).apply()
+
+    /** 予定 */
+    var careSchedule: Boolean
+        get() = sp.getBoolean("care_schedule", true)
+        set(value) = sp.edit().putBoolean("care_schedule", value).apply()
+
+    /** スマホの使いすぎチェック */
+    var careScreenTime: Boolean
+        get() = sp.getBoolean("care_screen", true)
+        set(value) = sp.edit().putBoolean("care_screen", value).apply()
+
     var careMoney: Boolean
         get() = sp.getBoolean("care_money", false)
         set(value) = sp.edit().putBoolean("care_money", value).apply()

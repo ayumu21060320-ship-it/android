@@ -169,6 +169,7 @@ class MainActivity : Activity() {
         }
         MochiNotificationListener.ensureConnected(this)
         GarbageAlarm.schedule(this)
+        ScheduleAlarm.schedule(this)
         refresh()
         refreshTab()
     }
@@ -278,6 +279,8 @@ class MainActivity : Activity() {
             Triple("⚖️", "体重", "今日の体重") to { WeightDialogs.record(this) { refreshTab() } },
             Triple("💰", "お金", "使ったお金") to { startActivity(Intent(this, MoneyActivity::class.java)) },
             Triple("😊", "調子", "体調・気分") to { ConditionStore.dialog(this) { msg -> refreshTab(); toast(msg) } },
+            Triple("✅", "やること", "今日のToDo") to { startActivity(Intent(this, TodoActivity::class.java)) },
+            Triple("📅", "予定", "予定を入れる") to { startActivity(Intent(this, ScheduleActivity::class.java)) },
         )
         var row: LinearLayout? = null
         options.forEachIndexed { i, (labels, action) ->
