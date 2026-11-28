@@ -118,6 +118,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("lock_maid", true)
         set(value) = sp.edit().putBoolean("lock_maid", value).apply()
 
+    /** リリと話すための Anthropic の API キー(スマホの中だけに保存) */
+    var anthropicKey: String?
+        get() = sp.getString("anthropic_key", null)
+        set(v) = sp.edit().putString("anthropic_key", v?.trim()).apply()
+
     /** 勝手にふわふわ動き回るか */
     var driftEnabled: Boolean
         get() = sp.getBoolean("drift", true)

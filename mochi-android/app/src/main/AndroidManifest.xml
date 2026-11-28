@@ -63,6 +63,12 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".ChatActivity"
+            android:exported="false"
+            android:label="リリ"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".WeightActivity"
             android:exported="false"
             android:label="体重" />

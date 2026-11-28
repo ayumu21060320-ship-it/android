@@ -32,6 +32,11 @@ android {
         }
     }
 
+    packaging {
+        // 部品どうしで同じ名前の説明ファイルがぶつかるのをよける
+        resources.excludes += setOf("META-INF/*.version", "META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*", "META-INF/INDEX.LIST", "META-INF/*.kotlin_module")
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -44,5 +49,7 @@ android {
 dependencies {
     // おうちに着いた・出た、を電池にやさしく見張る(ジオフェンス)
     implementation("com.google.android.gms:play-services-location:21.3.0")
+    // リリの会話(Claude API)
+    implementation("com.anthropic:anthropic-java:3.3.0")
     testImplementation("junit:junit:4.13.2")
 }

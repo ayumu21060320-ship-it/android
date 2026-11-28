@@ -112,6 +112,11 @@ class HomeTab(a: Activity, private val goSettings: () -> Unit) : TabUi(a) {
             setPadding(px(10), px(6), px(10), px(6))
             setOnClickListener { toggleOverlay() }
         }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = px(8) })
+        right.addView(text("💬 リリと話す ›", 13f, a.getColor(R.color.accent), bold = true).apply {
+            setBackgroundResource(R.drawable.button_sub_bg)
+            setPadding(px(12), px(6), px(12), px(6))
+            setOnClickListener { open(ChatActivity::class.java) }
+        }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = px(6) })
         row.addView(right, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = px(4) })
         c.addView(row)
         maid.setOnClickListener {

@@ -510,11 +510,11 @@ class OverlayService : Service() {
         }
     }
 
+    /** 長押し: リリとのチャットを開く */
     private fun openSettings() {
         mochi?.react()
-        talk(MochiLines.openSettings(prefs.masterName))
         startActivity(
-            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            Intent(this, ChatActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }
 

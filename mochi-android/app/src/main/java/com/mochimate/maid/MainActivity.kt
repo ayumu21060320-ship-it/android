@@ -106,6 +106,21 @@ class MainActivity : Activity() {
             prefs.careMoney = it
             openMoney.visibility = if (it) View.VISIBLE else View.GONE
         }
+        val keyStatus = findViewById<TextView>(R.id.apiKeyStatus)
+        fun showKeyStatus() {
+            val k = prefs.anthropicKey
+            keyStatus.text = if (k.isNullOrBlank()) "未設定" else "✅ 設定済み（…${k.takeLast(4)}）"
+        }
+        showKeyStatus()
+        findViewById<EditText>(R.id.apiKey).addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                val v = s?.toString()?.trim().orEmpty()
+                if (v.startsWith("sk-ant-") && v.length > 30) { prefs.anthropicKey = v; showKeyStatus() }
+            }
+        })
+        findViewById<Button>(R.id.openChat).setOnClickListener { startActivity(Intent(this, ChatActivity::class.java)) }
         findViewById<Button>(R.id.openIntegration).setOnClickListener {
             startActivity(Intent(this, IntegrationActivity::class.java))
         }
