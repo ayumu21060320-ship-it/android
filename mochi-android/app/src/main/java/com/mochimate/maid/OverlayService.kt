@@ -90,6 +90,7 @@ class OverlayService : Service() {
         MochiNotificationListener.ensureConnected(this)
         isRunning = true
         instance = this
+        startFullscreenProbe()
         applyHidden()
         return START_STICKY
     }
@@ -99,6 +100,7 @@ class OverlayService : Service() {
         if (instance === this) instance = null
         runCatching { unregisterReceiver(batteryReceiver) }
         runCatching { unregisterReceiver(screenReceiver) }
+        stopFullscreenProbe()
         homeWifi?.stop()
         card?.dismiss()
         dismissRich(resume = false)
@@ -701,9 +703,51 @@ class OverlayService : Service() {
 
     private var hidden = false
 
+    // ---------- ほかのアプリが全画面の時も隠れる ----------
+
+    /** 画面の高さいっぱいの、見えない・さわれない細い窓。ステータスバーが消えたら「全画面」と判断する */
+    private var fullscreenProbe: View? = null
+
+    private fun startFullscreenProbe() {
+        if (fullscreenProbe != null) return
+        val probe = View(this)
+        val lp = WindowManager.LayoutParams(
+            1, WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSPARENT,
+        ).apply { gravity = Gravity.TOP or Gravity.START }
+        probe.setOnApplyWindowInsetsListener { v, insets ->
+            val statusShown = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                insets.isVisible(android.view.WindowInsets.Type.statusBars())
+            } else {
+                @Suppress("DEPRECATION")
+                insets.systemWindowInsetTop > 0
+            }
+            val fs = !statusShown
+            if (fs != otherFullscreen) {
+                otherFullscreen = fs
+                // 全画面の切り替えは一瞬ぶれることがあるので、少し待ってから反映
+                handler.removeCallbacks(applyHiddenLater)
+                handler.postDelayed(applyHiddenLater, if (fs) 400 else 250)
+            }
+            v.onApplyWindowInsets(insets)
+        }
+        runCatching { wm.addView(probe, lp) }.onSuccess { fullscreenProbe = probe }
+    }
+
+    private fun stopFullscreenProbe() {
+        fullscreenProbe?.let { runCatching { wm.removeView(it) } }
+        fullscreenProbe = null
+        otherFullscreen = false
+    }
+
+    private val applyHiddenLater = Runnable { applyHidden() }
+
     private fun applyHidden() {
         val m = mochi ?: return
-        val hide = appVisible
+        val hide = appVisible || (otherFullscreen && prefs.hideInFullscreen)
         if (hide == hidden) return
         hidden = hide
         if (hide) {
@@ -805,7 +849,7 @@ class OverlayService : Service() {
         fun showCard(spec: CardSpec): Boolean {
             val s = instance ?: return false
             // アプリを開いている間はメイドさんが隠れているので、元の通知は消さずに残す
-            if (appVisible) return false
+            if (appVisible || (otherFullscreen && s.prefs.hideInFullscreen)) return false
             s.handler.post {
                 if (s.prefs.cardAtTop) {
                     val c = s.card ?: NotifyCard(s, s.wm).also { s.card = it }
@@ -843,6 +887,10 @@ class OverlayService : Service() {
         /** メイドさんのアプリの画面が開いているか(開いている間はホーム画面のメイドさんを隠す) */
         @Volatile
         private var appVisible = false
+
+        /** ほかのアプリが全画面(動画・ゲームなど)で表示中か */
+        @Volatile
+        private var otherFullscreen = false
 
         fun setAppVisible(visible: Boolean) {
             appVisible = visible

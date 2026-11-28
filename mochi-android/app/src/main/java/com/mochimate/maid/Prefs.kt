@@ -133,6 +133,11 @@ class Prefs(context: Context) {
         get() = sp.getString("anthropic_key", null)
         set(v) = sp.edit().putString("anthropic_key", v?.trim()).apply()
 
+    /** ほかのアプリが全画面の時は隠れるか */
+    var hideInFullscreen: Boolean
+        get() = sp.getBoolean("hide_fullscreen", true)
+        set(value) = sp.edit().putBoolean("hide_fullscreen", value).apply()
+
     /** 勝手にふわふわ動き回るか */
     var driftEnabled: Boolean
         get() = sp.getBoolean("drift", true)

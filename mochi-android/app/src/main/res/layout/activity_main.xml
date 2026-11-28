@@ -88,6 +88,14 @@
                 android:textSize="16sp" />
 
             <CheckBox
+                android:id="@+id/hideFullscreen"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="🎬 ほかのアプリが全画面の時は隠れる（動画・ゲームなど）"
+                android:textColor="@color/ink"
+                android:textSize="16sp" />
+
+            <CheckBox
                 android:id="@+id/lockMaid"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

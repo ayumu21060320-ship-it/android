@@ -71,6 +71,7 @@ class MainActivity : Activity() {
         }
         setupCitySearch()
         bindCheck(R.id.drift, prefs.driftEnabled) { prefs.driftEnabled = it }
+        bindCheck(R.id.hideFullscreen, prefs.hideInFullscreen) { prefs.hideInFullscreen = it }
         home = HomeSettings(this, findViewById(R.id.homeCard)).also { it.build() }
         bindCheck(R.id.lockMaid, prefs.lockScreenMaid) { prefs.lockScreenMaid = it }
         findViewById<Button>(R.id.lockDiag).setOnClickListener {
