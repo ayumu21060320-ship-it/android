@@ -30,11 +30,10 @@ class FocusService : Service() {
         when (intent?.action) {
             ACTION_STOP -> { finish(completed = false); return START_NOT_STICKY }
             else -> {
-                val minutes = intent?.getIntExtra(EXTRA_MINUTES, 25) ?: 25
-                label = intent?.getStringExtra(EXTRA_LABEL) ?: "集中"
-                totalMinutes = minutes
+                val seconds = intent?.getIntExtra(EXTRA_SECONDS, 25 * 60) ?: (25 * 60)
+                totalSeconds = seconds
                 startedAt = System.currentTimeMillis()
-                endAt = startedAt + minutes * 60_000L
+                endAt = startedAt + seconds * 1000L
                 running = true
                 goForeground()
                 handler.removeCallbacks(done)
@@ -52,7 +51,7 @@ class FocusService : Service() {
         val stop = PendingIntent.getService(this, 41, Intent(this, FocusService::class.java).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val n = Notification.Builder(this, CH_RUN)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("⏱️ $label に集中中")
+            .setContentTitle("⏱️ 集中タイマー")
             .setContentText("リリが静かに見守っています")
             .setWhen(endAt)
             .setUsesChronometer(true)
@@ -72,11 +71,13 @@ class FocusService : Service() {
     private fun finish(completed: Boolean) {
         handler.removeCallbacks(done)
         if (running) {
-            val mins = if (completed) totalMinutes else ((System.currentTimeMillis() - startedAt) / 60_000L).toInt()
-            if (mins >= 1) FocusStore(this).add(FocusSession(LocalDate.now(), mins, label, System.currentTimeMillis()))
+            val secs = if (completed) totalSeconds else ((System.currentTimeMillis() - startedAt) / 1000L).toInt()
+            // 記録は分単位(30秒以上なら切り上げ)
+            val mins = (secs + 30) / 60
+            if (mins >= 1) FocusStore(this).add(FocusSession(LocalDate.now(), mins, "", System.currentTimeMillis()))
             running = false
             OverlayService.focusChanged()
-            praise(this, completed, mins, label)
+            praise(this, completed, secs)
         }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -89,8 +90,7 @@ class FocusService : Service() {
     }
 
     companion object {
-        const val EXTRA_MINUTES = "minutes"
-        const val EXTRA_LABEL = "label"
+        const val EXTRA_SECONDS = "seconds"
         private const val ACTION_STOP = "com.mochimate.maid.FOCUS_STOP"
         private const val CH_RUN = "mochi_focus_run"
         private const val CH_DONE = "mochi_focus_done"
@@ -103,15 +103,26 @@ class FocusService : Service() {
             private set
         @Volatile var startedAt = 0L
             private set
-        @Volatile var totalMinutes = 0
-            private set
-        @Volatile var label = ""
+        @Volatile var totalSeconds = 0
             private set
 
         fun remainingMs() = if (running) max(0L, endAt - System.currentTimeMillis()) else 0L
 
-        fun start(c: Context, minutes: Int, label: String) {
-            c.startForegroundService(Intent(c, FocusService::class.java).putExtra(EXTRA_MINUTES, minutes).putExtra(EXTRA_LABEL, label))
+        fun start(c: Context, seconds: Int) {
+            c.startForegroundService(Intent(c, FocusService::class.java).putExtra(EXTRA_SECONDS, seconds))
+        }
+
+        /** 「1時間5分」「3分20秒」のような書き方 */
+        fun hms(sec: Int): String {
+            val h = sec / 3600
+            val m = sec % 3600 / 60
+            val s = sec % 60
+            return buildString {
+                if (h > 0) append("${h}時間")
+                if (m > 0) append("${m}分")
+                if (s > 0 && h == 0) append("${s}秒")
+                if (isEmpty()) append("0秒")
+            }
         }
 
         fun stop(c: Context) {
@@ -119,13 +130,13 @@ class FocusService : Service() {
         }
 
         /** 終わった時にリリがほめる(ホーム画面にいれば吹き出し、いなければ通知) */
-        private fun praise(c: Context, completed: Boolean, mins: Int, label: String) {
+        private fun praise(c: Context, completed: Boolean, secs: Int) {
             val name = Prefs(c).masterName
             val today = FocusStore(c).minutesOn(LocalDate.now())
             val line = if (completed) {
-                "${name}、おつかれさまでした！${label}を${FocusStore.hm(mins)}がんばりましたね♪\n今日はぜんぶで${FocusStore.hm(today)}です。ちょっと休憩しましょ！"
-            } else if (mins >= 1) {
-                "途中まででも${FocusStore.hm(mins)}がんばりましたね。えらいです！"
+                "${name}、おつかれさまでした！${hms(secs)}がんばりましたね♪\n今日はぜんぶで${FocusStore.hm(today)}です。ちょっと休憩しましょ！"
+            } else if (secs >= 60) {
+                "途中まででも${hms(secs)}がんばりましたね。えらいです！"
             } else {
                 "またいつでも始めてくださいね。わたし、見守ってますから！"
             }

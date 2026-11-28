@@ -33,13 +33,10 @@ class FocusStore(context: Context) {
     /** 今日をふくむ7日分(古い順) */
     fun lastWeek(): List<Pair<LocalDate, Int>> = (6 downTo 0).map { LocalDate.now().minusDays(it.toLong()) }.map { it to minutesOn(it) }
 
-    var lastLabel: String
-        get() = sp.getString("label", "勉強")!!
-        set(v) = sp.edit().putString("label", v).apply()
-
-    var lastMinutes: Int
-        get() = sp.getInt("minutes", 25)
-        set(v) = sp.edit().putInt("minutes", v).apply()
+    /** 前に使った時間(秒) */
+    var lastSeconds: Int
+        get() = sp.getInt("seconds", sp.getInt("minutes", 25) * 60)
+        set(v) = sp.edit().putInt("seconds", v).apply()
 
     companion object {
         fun hm(min: Int) = if (min >= 60) "${min / 60}時間${if (min % 60 > 0) "${min % 60}分" else ""}" else "${min}分"

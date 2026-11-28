@@ -5,7 +5,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
-import android.widget.EditText
+import android.widget.NumberPicker
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -67,38 +67,37 @@ class FocusActivity : Activity() {
         c.addView(clock, LinearLayout.LayoutParams(-1, -2))
 
         if (FocusService.running) {
-            c.addView(text("「${FocusService.label}」に集中中", 14f, sub = true).apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(-1, -2))
             c.addView(button("やめる") { FocusService.stop(this); handler.postDelayed({ render() }, 400) }, LinearLayout.LayoutParams(-1, px(48)).apply { topMargin = px(10) })
         } else {
-            val label = EditText(this).apply { setText(store.lastLabel); hint = "なにに集中する？"; textSize = 16f; setSingleLine() }
-            c.addView(text("なにをする？", 13f, sub = true))
-            val labels = FlowLayout(this).apply { setPadding(0, px(4), 0, 0) }
-            for (l in listOf("勉強", "SPI", "作業", "読書", "掃除")) {
-                labels.addView(chip(l, false) { label.setText(l) })
+            // 時計アプリのタイマーのように、時間・分・秒をくるくる回して選ぶ
+            val last = store.lastSeconds
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
+            fun wheel(max: Int, value: Int, unit: String): NumberPicker {
+                val p = NumberPicker(this).apply {
+                    minValue = 0; maxValue = max; this.value = value; wrapSelectorWheel = true
+                    setFormatter { "%02d".format(it) }
+                    setOnValueChangedListener { _, _, _ -> updateClock(selectedSeconds()) }
+                }
+                row.addView(p, LinearLayout.LayoutParams(px(72), -2))
+                row.addView(text(unit, 15f, sub = true).apply { setPadding(px(2), 0, px(10), 0) })
+                return p
             }
-            c.addView(labels)
-            c.addView(label)
-            var minutes = store.lastMinutes
-            c.addView(text("何分？", 13f, sub = true).apply { setPadding(0, px(8), 0, 0) })
-            val mins = FlowLayout(this).apply { setPadding(0, px(4), 0, 0) }
-            fun drawMins() {
-                mins.removeAllViews()
-                for (m in listOf(15, 25, 45, 60, 90)) mins.addView(chip("${m}分", m == minutes) { minutes = m; drawMins(); updateClock(m) })
-            }
-            drawMins()
-            c.addView(mins)
+            hours = wheel(23, last / 3600, "時間")
+            mins = wheel(59, last % 3600 / 60, "分")
+            secs = wheel(59, last % 60, "秒")
+            c.addView(row, LinearLayout.LayoutParams(-1, -2))
+            clock.visibility = android.view.View.GONE
             c.addView(button("はじめる") {
-                val l = label.text.toString().trim().ifEmpty { "集中" }
-                store.lastLabel = l
-                store.lastMinutes = minutes
-                FocusService.start(this, minutes, l)
+                val total = selectedSeconds()
+                if (total <= 0) { say.text = "時間を決めてくださいね！"; return@button }
+                store.lastSeconds = total
+                FocusService.start(this, total)
                 maid.react()
                 handler.postDelayed({ render() }, 300)
             }.apply {
                 setBackgroundResource(R.drawable.button_bg)
                 setTextColor(0xFFFFFFFF.toInt())
             }, LinearLayout.LayoutParams(-1, px(52)).apply { topMargin = px(12) })
-            updateClock(minutes)
         }
 
         // 記録
@@ -114,7 +113,7 @@ class FocusActivity : Activity() {
                 s.addView(LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
                     setPadding(0, px(4), 0, 0)
-                    addView(text("${r.date.monthValue}/${r.date.dayOfMonth}　${r.label}", 14f), LinearLayout.LayoutParams(0, -2, 1f))
+                    addView(text("${r.date.monthValue}/${r.date.dayOfMonth}", 14f), LinearLayout.LayoutParams(0, -2, 1f))
                     addView(text(FocusStore.hm(r.minutes), 14f, sub = true))
                 })
             }
@@ -123,19 +122,23 @@ class FocusActivity : Activity() {
         updateClock()
     }
 
-    private fun updateClock(previewMinutes: Int? = null) {
+    private var hours: NumberPicker? = null
+    private var mins: NumberPicker? = null
+    private var secs: NumberPicker? = null
+
+    private fun selectedSeconds() = (hours?.value ?: 0) * 3600 + (mins?.value ?: 0) * 60 + (secs?.value ?: 0)
+
+    private fun updateClock(@Suppress("UNUSED_PARAMETER") preview: Int? = null) {
         if (!::clock.isInitialized) return
         if (FocusService.running) {
             val s = (FocusService.remainingMs() / 1000).toInt()
-            clock.text = "%d:%02d".format(s / 60, s % 60)
+            clock.text = if (s >= 3600) "%d:%02d:%02d".format(s / 3600, s % 3600 / 60, s % 60) else "%d:%02d".format(s / 60, s % 60)
             say.text = when {
-                s > FocusService.totalMinutes * 60 - 10 -> "よーし、がんばりましょう！わたしは静かにしてますね"
+                s > FocusService.totalSeconds - 10 -> "よーし、がんばりましょう！わたしは静かにしてますね"
                 s < 60 -> "あとちょっとです！"
                 else -> "がんばってますね…（そーっと見守り中）"
             }
         } else {
-            val m = previewMinutes ?: store.lastMinutes
-            clock.text = "%d:00".format(m)
             say.text = "${Prefs(this).masterName}、いっしょにがんばりましょ！始めたら、わたしは静かにしてますね"
             if (wasRunning) { wasRunning = false; render() } // 終わったら記録を更新
         }

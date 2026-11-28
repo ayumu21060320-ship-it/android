@@ -268,7 +268,6 @@ class HomeTab(a: Activity, private val goSettings: () -> Unit) : TabUi(a) {
             val m = FocusService.remainingMs() / 60_000L + 1
             c.addView(text("集中中", 12f, a.getColor(R.color.accent), bold = true).apply { setPadding(0, px(6), 0, 0) })
             c.addView(big(m.toString(), "分のこり"))
-            c.addView(text(FocusService.label, 12f, sub))
             return
         }
         val today = f.minutesOn(LocalDate.now())

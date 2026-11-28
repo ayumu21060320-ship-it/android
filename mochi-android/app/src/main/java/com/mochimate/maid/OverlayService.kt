@@ -453,7 +453,7 @@ class OverlayService : Service() {
         val name = prefs.masterName
         if (FocusService.running) {
             val m = (FocusService.remainingMs() / 60_000L + 1)
-            talk(MochiLines.focusing(name, FocusService.label, m.toInt()))
+            talk(MochiLines.focusing(name, m.toInt()))
             return
         }
         talkCount++

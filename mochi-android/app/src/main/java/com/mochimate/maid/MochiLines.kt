@@ -73,8 +73,8 @@ object MochiLines {
     }
 
     /** 集中タイマー中にタップされた時(じゃましないよう短く) */
-    fun focusing(name: String, label: String, minutesLeft: Int): String = pick(
-        "しーっ…${label}中ですよ。あと${minutesLeft}分、がんばって！",
+    fun focusing(name: String, minutesLeft: Int): String = pick(
+        "しーっ…集中中ですよ。あと${minutesLeft}分、がんばって！",
         "${name}、集中集中！あと${minutesLeft}分です",
         "えへへ、見守ってますよ。あと${minutesLeft}分！",
     )
