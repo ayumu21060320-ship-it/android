@@ -28,10 +28,19 @@ class MainActivity : Activity() {
     private lateinit var toggle: Button
     private lateinit var home: HomeSettings
 
+    // タブ: 0=ホーム 1=健康 2=お金 3=設定
+    private lateinit var homeTab: HomeTab
+    private lateinit var healthTab: HealthTab
+    private lateinit var moneyTab: MoneyTab
+    private lateinit var settingsView: View
+    private var current = 0
+    private val navItems = ArrayList<TextView>()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        setContentView(R.layout.activity_shell)
         prefs = Prefs(this)
+        setupShell()
 
         hello = findViewById(R.id.hello)
         permissionCard = findViewById(R.id.permissionCard)
@@ -85,14 +94,14 @@ class MainActivity : Activity() {
         }
         val openCalorie = findViewById<Button>(R.id.openCalorie)
         openCalorie.visibility = if (prefs.careCalorie) View.VISIBLE else View.GONE
-        openCalorie.setOnClickListener { startActivity(Intent(this, HealthActivity::class.java)) }
+        openCalorie.setOnClickListener { showTab(1) }
         bindCheck(R.id.careCalorie, prefs.careCalorie) {
             prefs.careCalorie = it
             openCalorie.visibility = if (it) View.VISIBLE else View.GONE
         }
         val openMoney = findViewById<Button>(R.id.openMoney)
         openMoney.visibility = if (prefs.careMoney) View.VISIBLE else View.GONE
-        openMoney.setOnClickListener { startActivity(Intent(this, MoneyActivity::class.java)) }
+        openMoney.setOnClickListener { showTab(2) }
         bindCheck(R.id.careMoney, prefs.careMoney) {
             prefs.careMoney = it
             openMoney.visibility = if (it) View.VISIBLE else View.GONE
@@ -118,7 +127,7 @@ class MainActivity : Activity() {
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 )
             }
-            toggle.postDelayed({ refresh() }, 300)
+            toggle.postDelayed({ refresh(); refreshTab() }, 300)
         }
 
         hello.text = MochiLines.greeting(prefs.masterName)
@@ -144,7 +153,148 @@ class MainActivity : Activity() {
         }
         MochiNotificationListener.ensureConnected(this)
         refresh()
+        refreshTab()
     }
+
+    override fun onBackPressed() {
+        when {
+            findViewById<View>(R.id.recordSheet).visibility == View.VISIBLE -> closeRecordMenu()
+            current != 0 -> showTab(0)
+            else -> @Suppress("DEPRECATION") super.onBackPressed()
+        }
+    }
+
+    // ---------- 外枠: タブ・呼び鈴・記録メニュー ----------
+
+    private fun setupShell() {
+        val content = findViewById<android.widget.FrameLayout>(R.id.tabContent)
+        homeTab = HomeTab(this) { showTab(3) }
+        healthTab = HealthTab(this)
+        moneyTab = MoneyTab(this)
+        settingsView = layoutInflater.inflate(R.layout.activity_main, content, false)
+        for (v in listOf(homeTab.view, healthTab.view, moneyTab.view, settingsView)) {
+            content.addView(v, android.widget.FrameLayout.LayoutParams(-1, -1))
+        }
+
+        val nav = findViewById<LinearLayout>(R.id.bottomNav)
+        val labels = listOf("🏠" to "ホーム", "🩺" to "健康", "💰" to "お金", "⚙️" to "設定")
+        labels.forEachIndexed { i, (icon, label) ->
+            val item = TextView(this).apply {
+                text = "$icon\n$label"
+                textSize = 12f
+                gravity = android.view.Gravity.CENTER
+                setLineSpacing(0f, 1.1f)
+                setOnClickListener { showTab(i) }
+            }
+            navItems += item
+            nav.addView(item, LinearLayout.LayoutParams(0, -1, 1f))
+        }
+        // 右の呼び鈴とかぶらないよう、タブを少し左に寄せる
+        nav.addView(View(this), LinearLayout.LayoutParams((84 * resources.displayMetrics.density).toInt(), -1))
+
+        findViewById<View>(R.id.bell).setOnClickListener {
+            if (findViewById<View>(R.id.recordSheet).visibility == View.VISIBLE) closeRecordMenu() else openRecordMenu()
+        }
+        findViewById<View>(R.id.dim).setOnClickListener { closeRecordMenu() }
+        buildRecordMenu()
+        showTab(0)
+    }
+
+    private fun showTab(i: Int) {
+        current = i
+        listOf(homeTab.view, healthTab.view, moneyTab.view, settingsView).forEachIndexed { j, v ->
+            v.visibility = if (j == i) View.VISIBLE else View.GONE
+        }
+        navItems.forEachIndexed { j, t ->
+            val on = j == i
+            t.setTextColor(getColor(if (on) R.color.accent else R.color.ink_sub))
+            t.paint.isFakeBoldText = on
+            t.invalidate()
+        }
+        findViewById<TextView>(R.id.tabTitle).text = when (i) {
+            1 -> "健康管理"
+            2 -> "お金"
+            3 -> "設定"
+            else -> "もちもちメイド"
+        }
+        refreshTab()
+    }
+
+    private fun refreshTab() {
+        if (!::homeTab.isInitialized) return
+        when (current) {
+            0 -> homeTab.refresh()
+            1 -> healthTab.refresh()
+            2 -> moneyTab.refresh()
+        }
+    }
+
+    private fun buildRecordMenu() {
+        val sheet = findViewById<LinearLayout>(R.id.recordSheet)
+        val d = resources.displayMetrics.density
+        fun px(v: Int) = (v * d).toInt()
+        sheet.removeAllViews()
+        val head = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
+        val maid = MochiView(this)
+        head.addView(maid, LinearLayout.LayoutParams(px(68), px(86)))
+        head.addView(TextView(this).apply {
+            text = "はい、${prefs.masterName}！\nなにを記録しますか？"
+            textSize = 15f
+            setTextColor(getColor(R.color.ink))
+            setBackgroundResource(R.drawable.bubble_card_bg)
+            setPadding(px(12), px(10), px(12), px(10))
+        }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = px(6) })
+        sheet.addView(head)
+
+        val options = listOf(
+            Triple("🍙", "ごはん", "食べたもの") to { startActivity(Intent(this, FoodSearchActivity::class.java)) },
+            Triple("⚖️", "体重", "今日の体重") to { WeightDialogs.record(this) { refreshTab() } },
+            Triple("💰", "お金", "使ったお金") to { startActivity(Intent(this, MoneyActivity::class.java)) },
+            Triple("😊", "調子", "体調・気分") to { ConditionStore.dialog(this) { msg -> refreshTab(); toast(msg) } },
+        )
+        var row: LinearLayout? = null
+        options.forEachIndexed { i, (labels, action) ->
+            if (i % 2 == 0) {
+                row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                sheet.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = px(10) })
+            }
+            val (icon, title, sub) = labels
+            val opt = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setBackgroundResource(R.drawable.option_bg)
+                setPadding(px(12), px(12), px(12), px(12))
+                setOnClickListener { closeRecordMenu(); action() }
+                addView(TextView(this@MainActivity).apply { text = icon; textSize = 22f })
+                addView(LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(px(8), 0, 0, 0)
+                    addView(TextView(this@MainActivity).apply {
+                        text = title; textSize = 15f; setTextColor(getColor(R.color.ink)); paint.isFakeBoldText = true
+                    })
+                    addView(TextView(this@MainActivity).apply { text = sub; textSize = 11f; setTextColor(getColor(R.color.ink_sub)) })
+                })
+            }
+            row!!.addView(opt, LinearLayout.LayoutParams(0, -2, 1f).apply { if (i % 2 == 1) marginStart = px(8) })
+        }
+    }
+
+    private fun openRecordMenu() {
+        buildRecordMenu() // 呼び方が変わっていても反映されるように
+        findViewById<View>(R.id.dim).visibility = View.VISIBLE
+        findViewById<View>(R.id.recordSheet).visibility = View.VISIBLE
+        findViewById<TextView>(R.id.bell).apply { text = "✕"; isSelected = true }
+        findViewById<TextView>(R.id.bellLabel).setTextColor(getColor(R.color.accent))
+    }
+
+    private fun closeRecordMenu() {
+        findViewById<View>(R.id.dim).visibility = View.GONE
+        findViewById<View>(R.id.recordSheet).visibility = View.GONE
+        findViewById<TextView>(R.id.bell).apply { text = "🛎️"; isSelected = false }
+        findViewById<TextView>(R.id.bellLabel).setTextColor(getColor(R.color.navy))
+    }
+
+    private fun toast(msg: String) = android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show()
 
     private fun refresh() {
         val canOverlay = Settings.canDrawOverlays(this)

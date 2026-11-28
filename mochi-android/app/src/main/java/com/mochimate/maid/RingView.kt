@@ -40,8 +40,16 @@ class RingView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
         setMeasuredDimension(resolveSize(s, widthMeasureSpec), resolveSize(s, heightMeasureSpec))
     }
 
+    /** 小さいリング(ホームのカード用)では、上の「あと○kcal」を出さない */
+    var compact = false
+
     override fun onDraw(canvas: Canvas) {
         val size = minOf(width, height).toFloat()
+        // 大きさに合わせて線と文字の太さを変える
+        track.strokeWidth = size * 0.085f
+        bar.strokeWidth = track.strokeWidth
+        big.textSize = size * 0.2f
+        small.textSize = size * 0.075f
         val pad = track.strokeWidth / 2 + 2 * d
         val cx = width / 2f
         val cy = height / 2f
@@ -59,8 +67,10 @@ class RingView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
         }
 
         big.color = bar.color
-        canvas.drawText("${(ratio * 100).toInt()}%", cx, cy + 6 * d, big)
-        canvas.drawText("$value / $goal kcal", cx, cy + 28 * d, small)
-        canvas.drawText(if (over) "${value - goal} kcal オーバー" else "あと ${goal - value} kcal", cx, cy - 26 * d, small)
+        canvas.drawText("${(ratio * 100).toInt()}%", cx, cy + size * 0.04f, big)
+        canvas.drawText(if (compact) "$value kcal" else "$value / $goal kcal", cx, cy + size * 0.17f, small)
+        if (!compact) {
+            canvas.drawText(if (over) "${value - goal} kcal オーバー" else "あと ${goal - value} kcal", cx, cy - size * 0.15f, small)
+        }
     }
 }
