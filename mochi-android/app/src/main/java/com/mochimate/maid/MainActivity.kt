@@ -226,7 +226,17 @@ class MainActivity : Activity() {
             0 -> homeTab.refresh()
             1 -> healthTab.refresh()
             2 -> moneyTab.refresh()
+            3 -> syncSettings()
         }
+    }
+
+    /** ホームのチップで切り替えた内容を、設定タブのチェックにも反映する */
+    private fun syncSettings() {
+        findViewById<CheckBox>(R.id.careWeather).isChecked = prefs.careWeather
+        findViewById<CheckBox>(R.id.careCalorie).isChecked = prefs.careCalorie
+        findViewById<CheckBox>(R.id.careMoney).isChecked = prefs.careMoney
+        findViewById<CheckBox>(R.id.drift).isChecked = prefs.driftEnabled
+        findViewById<CheckBox>(R.id.lockMaid).isChecked = prefs.lockScreenMaid
     }
 
     private fun buildRecordMenu() {

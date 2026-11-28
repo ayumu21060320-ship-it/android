@@ -451,17 +451,55 @@ class OverlayService : Service() {
         val name = prefs.masterName
         talkCount++
         // あいさつ → (天気) → (カロリー) → ふつうのおしゃべり、の順にくり返す
+        // おまかせされている項目だけを話題にする。カロリー・体重・お金は吹き出しに小さなグラフをつける
         val topics = buildList<() -> Unit> {
             add { talk(MochiLines.greeting(name)) }
             if (prefs.careWeather) add { talkWeather() }
-            if (prefs.careCalorie) add { talk(CalorieStore(this@OverlayService).line(name)) }
-            if (prefs.careMoney) add { talk(MoneyStore(this@OverlayService).line(name)) }
+            if (prefs.careCalorie) add { talkWith(CalorieStore(this@OverlayService).line(name), BubbleVisuals::calorie) }
+            if (prefs.careWeight) add { talkWith(WeightStore(this@OverlayService).line(name), BubbleVisuals::weight) }
+            if (prefs.careCondition) add { talkCondition() }
+            if (prefs.careMoney) add { talkWith(MoneyStore(this@OverlayService).line(name), BubbleVisuals::money) }
         }
         val i = (talkCount - 1) % (topics.size + 1)
         when {
             i < topics.size -> topics[i]()
             else -> talk(MochiLines.random(name))
         }
+    }
+
+    /** セリフと一緒に、吹き出しの中へ小さなグラフを出す */
+    private fun talkWith(line: String, visual: (Context) -> View) {
+        showRich(
+            CardSpec(icon = null, appLabel = "", title = "", body = null, header = line, visual = visual, timeoutMs = 9_000),
+        )
+    }
+
+    /** 今日の調子をまだ聞いていなければ顔を選んでもらう。記録済みなら昨日との比べっこを見せる */
+    private fun talkCondition() {
+        val store = ConditionStore(this)
+        val today = store.get()
+        if (today.body == null) askCondition() else {
+            talkWith(ConditionStore.reply(prefs.masterName, today.body, today.mood), BubbleVisuals::condition)
+        }
+    }
+
+    private fun askCondition() {
+        val store = ConditionStore(this)
+        val faces = ConditionStore.FACES.mapIndexed { i, f ->
+            f to {
+                val now = store.get()
+                store.set(i + 1, now.mood)
+                handler.postDelayed({ talk(ConditionStore.reply(prefs.masterName, i + 1, now.mood)) }, 200)
+                Unit
+            }
+        }
+        showRich(
+            CardSpec(
+                icon = null, appLabel = "", title = "", body = null,
+                header = "${prefs.masterName}、今日の体調はどうですか？",
+                actions = faces, timeoutMs = 30_000,
+            ),
+        )
     }
 
     private fun talkWeather() {
@@ -544,10 +582,18 @@ class OverlayService : Service() {
         override fun run() {
             val now = java.util.Calendar.getInstance()
             val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(now.time)
-            if (prefs.careCalorie && now.get(java.util.Calendar.HOUR_OF_DAY) >= 21 && prefs.lastDietReview != today && rich == null) {
+            val hour = now.get(java.util.Calendar.HOUR_OF_DAY)
+            // 朝(6〜11時)に1回、今日の調子を聞く
+            if (prefs.careCondition && hour in 6..11 && prefs.lastConditionAsk != today && rich == null &&
+                ConditionStore(this@OverlayService).get().body == null
+            ) {
+                prefs.lastConditionAsk = today
+                askCondition()
+            }
+            if (prefs.careCalorie && hour >= 21 && prefs.lastDietReview != today && rich == null) {
                 prefs.lastDietReview = today
                 mochi?.react()
-                talk(DietScore.review(CalorieStore(this@OverlayService), prefs.masterName))
+                talkWith(DietScore.review(CalorieStore(this@OverlayService), prefs.masterName), BubbleVisuals::calorie)
             }
             handler.postDelayed(this, 10 * 60_000)
         }
@@ -661,7 +707,8 @@ class OverlayService : Service() {
 
     private fun keepRich() {
         handler.removeCallbacks(richDismiss)
-        if (richSpec?.sticky != true) handler.postDelayed(richDismiss, 12_000)
+        val spec = richSpec ?: return
+        if (!spec.sticky) handler.postDelayed(richDismiss, spec.timeoutMs)
     }
 
     private fun dismissRich(resume: Boolean = true) {

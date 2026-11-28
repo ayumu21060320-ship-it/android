@@ -38,6 +38,10 @@ data class CardSpec(
     val tag: String? = null,
     /** true なら時間で消えない(アラームなど) */
     val sticky: Boolean = false,
+    /** 吹き出しの中に出す小さなグラフなど(カロリーのリング・体重のグラフ…) */
+    val visual: ((Context) -> View)? = null,
+    /** 自動で消えるまでの時間(ミリ秒) */
+    val timeoutMs: Long = 12_000,
 )
 
 /** お知らせの中身(アイコン・タイトル・チップ・ボタン)を組み立てる。吹き出しとカードで共通。 */
@@ -67,13 +71,15 @@ object CardContent {
             }, LinearLayout.LayoutParams(px(44), px(44)).apply { marginEnd = px(10) })
         }
         val texts = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-        texts.addView(TextView(context).apply {
-            text = spec.appLabel
-            textSize = 12f
-            setTextColor(sub)
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-        })
+        if (spec.appLabel.isNotBlank()) {
+            texts.addView(TextView(context).apply {
+                text = spec.appLabel
+                textSize = 12f
+                setTextColor(sub)
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+            })
+        }
         if (spec.header != null) {
             texts.addView(TextView(context).apply {
                 text = spec.header
@@ -114,6 +120,10 @@ object CardContent {
             setOnClickListener { onClose() }
         })
         root.addView(top)
+
+        spec.visual?.let { make ->
+            root.addView(make(context), LinearLayout.LayoutParams(-1, -2).apply { topMargin = px(8) })
+        }
 
         if (spec.chips != null) {
             val flow = FlowLayout(context).apply { setPadding(0, px(8), 0, 0) }

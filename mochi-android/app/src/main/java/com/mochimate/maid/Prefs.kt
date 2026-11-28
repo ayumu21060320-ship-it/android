@@ -18,6 +18,21 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("care_calorie", false)
         set(value) = sp.edit().putBoolean("care_calorie", value).apply()
 
+    /** 体重のお世話(ホームに体重のカード、メイドさんが体重の話をする) */
+    var careWeight: Boolean
+        get() = sp.getBoolean("care_weight", true)
+        set(value) = sp.edit().putBoolean("care_weight", value).apply()
+
+    /** きょうの調子のお世話(朝に調子を聞く、ホームにカード) */
+    var careCondition: Boolean
+        get() = sp.getBoolean("care_condition", true)
+        set(value) = sp.edit().putBoolean("care_condition", value).apply()
+
+    /** 最後に朝の調子を聞いた日(yyyy-MM-dd) */
+    var lastConditionAsk: String?
+        get() = sp.getString("condition_ask", null)
+        set(value) = sp.edit().putString("condition_ask", value).apply()
+
     var careMoney: Boolean
         get() = sp.getBoolean("care_money", false)
         set(value) = sp.edit().putBoolean("care_money", value).apply()

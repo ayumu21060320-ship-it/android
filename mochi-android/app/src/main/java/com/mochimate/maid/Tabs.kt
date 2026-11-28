@@ -139,92 +139,146 @@ class HomeTab(a: Activity, private val goSettings: () -> Unit) : TabUi(a) {
         }
     }
 
+    /** おまかせされている項目だけ、2列のカードで並べる */
     private fun grid() {
-        val cal = CalorieStore(a)
-        val t = cal.total()
-        val ws = WeightStore(a)
-        val money = MoneyStore(a)
-        val score = DietScore.of(cal, t)
-
-        fun row(): LinearLayout {
+        val tiles = buildList<(LinearLayout) -> Unit> {
+            if (prefs.careWeather) add(::weatherTile)
+            if (prefs.careCalorie) { add(::calorieTile); add(::scoreTile) }
+            if (prefs.careWeight) add(::weightTile)
+            if (prefs.careCondition) add(::conditionTile)
+            if (prefs.careMoney) add(::moneyTile)
+        }
+        if (tiles.isEmpty()) {
+            card(col).apply {
+                addView(text("下の「おまかせする項目」から、メイドさんにお世話してほしいものを選んでね。選んだものがここに並びます。", 13f, sub))
+            }
+            return
+        }
+        tiles.chunked(2).forEach { pair ->
             val r = LinearLayout(a).apply { orientation = LinearLayout.HORIZONTAL }
             col.addView(r, LinearLayout.LayoutParams(-1, -2).apply { topMargin = px(10) })
-            return r
-        }
-        fun tile(r: LinearLayout, first: Boolean, onClick: () -> Unit): LinearLayout {
-            val c = LinearLayout(a).apply {
-                orientation = LinearLayout.VERTICAL
-                setBackgroundResource(R.drawable.card_bg)
-                setPadding(px(12), px(12), px(12), px(12))
-                minimumHeight = px(150)
-                setOnClickListener { onClick() }
+            pair.forEachIndexed { i, build ->
+                val c = LinearLayout(a).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setBackgroundResource(R.drawable.card_bg)
+                    setPadding(px(12), px(12), px(12), px(12))
+                    minimumHeight = px(150)
+                }
+                r.addView(c, LinearLayout.LayoutParams(0, -1, 1f).apply { if (i == 1) marginStart = px(10) })
+                build(c)
             }
-            r.addView(c, LinearLayout.LayoutParams(0, -1, 1f).apply { if (!first) marginStart = px(10) })
-            return c
+            if (pair.size == 1) r.addView(View(a), LinearLayout.LayoutParams(0, 1, 1f).apply { marginStart = px(10) })
         }
+    }
 
-        val r1 = row()
-        tile(r1, true) { open(CalorieActivity::class.java) }.apply {
-            header(this, "🍙 カロリー", "›")
-            addView(RingView(a).apply { compact = true; set(t.kcal, cal.goal) },
-                LinearLayout.LayoutParams(px(88), px(88)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = px(4) })
-            val left = cal.goal - t.kcal
-            addView(text(if (left >= 0) "あと $left kcal" else "${-left} kcal オーバー", 12f, sub).apply { gravity = Gravity.CENTER },
-                LinearLayout.LayoutParams(-1, -2))
+    private fun weatherTile(c: LinearLayout) {
+        c.setOnClickListener { goSettings() }
+        header(c, "☀️ 天気", "›")
+        val w = WeatherRepository.cachedToday(prefs)
+        if (w == null) {
+            c.addView(text(if (prefs.cityName == null) "設定で街を選んでね" else "お天気を調べています…", 13f, sub).apply { setPadding(0, px(6), 0, 0) })
+            if (prefs.cityName != null) WeatherRepository.today(prefs) { if (it != null) refresh() }
+            return
         }
-        tile(r1, false) { open(WeightActivity::class.java) }.apply {
-            header(this, "⚖️ 体重", "›")
-            val last = ws.latest()
-            addView(if (last != null) big(last.second.toString(), "kg") else text("未記録", 18f, sub, bold = true))
-            val diff = ws.diffFromPrevious()
-            addView(text(when {
-                diff == null -> "毎日はかろう"
-                diff <= 0 -> "▼${"%.1f".format(-diff)}kg 前回より"
-                else -> "▲${"%.1f".format(diff)}kg 前回より"
-            }, 12f, if (diff != null && diff <= 0) Color.parseColor("#2EA36B") else sub, bold = diff != null))
-            addView(SparkView(a).apply { set(ws.all().takeLast(7).map { it.second }) }, LinearLayout.LayoutParams(-1, px(40)).apply { topMargin = px(6) })
-        }
+        c.addView(big(w.temp.roundToInt().toString(), "℃"))
+        c.addView(text(w.label, 14f, bold = true))
+        c.addView(text("最高${w.max.roundToInt()}℃・最低${w.min.roundToInt()}℃", 12f, sub))
+        c.addView(text("降水 ${w.rainChance}%", 12f, sub))
+    }
 
-        val r2 = row()
-        tile(r2, true) { open(MoneyActivity::class.java) }.apply {
-            header(this, "💰 今月のお金", "›")
-            val total = money.monthTotal()
-            addView(big("%,d".format(total), "円"))
-            addView(text("予算 ${MoneyStore.yen(money.monthlyBudget)}", 12f, sub))
-            addView(bar(total.toDouble() / money.monthlyBudget.coerceAtLeast(1), "#5B9BD5"), LinearLayout.LayoutParams(-1, px(8)).apply { topMargin = px(8) })
-            val c = Calendar.getInstance()
-            val daysLeft = c.getActualMaximum(Calendar.DAY_OF_MONTH) - c.get(Calendar.DAY_OF_MONTH) + 1
-            val left = money.monthlyBudget - total
-            addView(text(if (left >= 0) "1日 ${MoneyStore.yen(left / daysLeft)}までOK" else "予算オーバー中", 12f, sub).apply { setPadding(0, px(6), 0, 0) })
+    private fun calorieTile(c: LinearLayout) {
+        val cal = CalorieStore(a)
+        val t = cal.total()
+        c.setOnClickListener { open(CalorieActivity::class.java) }
+        header(c, "🍙 カロリー", "›")
+        c.addView(RingView(a).apply { compact = true; set(t.kcal, cal.goal) },
+            LinearLayout.LayoutParams(px(88), px(88)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = px(4) })
+        val left = cal.goal - t.kcal
+        c.addView(text(if (left >= 0) "あと $left kcal" else "${-left} kcal オーバー", 12f, sub).apply { gravity = Gravity.CENTER },
+            LinearLayout.LayoutParams(-1, -2))
+    }
+
+    private fun scoreTile(c: LinearLayout) {
+        val cal = CalorieStore(a)
+        val score = DietScore.of(cal)
+        c.setOnClickListener { open(CalorieActivity::class.java) }
+        header(c, "📝 今日の点数", "›")
+        c.addView(if (score != null) big(score.total.toString(), "点") else text("－", 22f, sub, bold = true))
+        c.addView(text(score?.rank ?: "ごはんを記録すると点数が出ます", 12f, sub))
+        cal.pfcAdvice()?.let { c.addView(text(it, 12f, sub).apply { setPadding(0, px(6), 0, 0) }) }
+    }
+
+    private fun weightTile(c: LinearLayout) {
+        val ws = WeightStore(a)
+        c.setOnClickListener { open(WeightActivity::class.java) }
+        header(c, "⚖️ 体重", "›")
+        val last = ws.latest()
+        c.addView(if (last != null) big(last.second.toString(), "kg") else text("未記録", 18f, sub, bold = true))
+        val diff = ws.diffFromPrevious()
+        c.addView(text(when {
+            diff == null -> "毎日はかろう"
+            diff <= 0 -> "▼${"%.1f".format(-diff)}kg 前回より"
+            else -> "▲${"%.1f".format(diff)}kg 前回より"
+        }, 12f, if (diff != null && diff <= 0) Color.parseColor("#2EA36B") else sub, bold = diff != null))
+        c.addView(SparkView(a).apply { set(ws.all().takeLast(7).map { it.second }) }, LinearLayout.LayoutParams(-1, px(40)).apply { topMargin = px(6) })
+    }
+
+    private fun conditionTile(c: LinearLayout) {
+        val s = ConditionStore(a)
+        val t = s.get()
+        c.setOnClickListener { ConditionStore.dialog(a) { refresh() } }
+        header(c, "😊 きょうの調子", "›")
+        if (t.body == null && t.mood == null) {
+            c.addView(text("まだ記録していません", 13f, sub).apply { setPadding(0, px(6), 0, 0) })
+            c.addView(text("タップして記録 ›", 13f, a.getColor(R.color.accent), bold = true).apply { setPadding(0, px(8), 0, 0) })
+            return
         }
-        tile(r2, false) { open(CalorieActivity::class.java) }.apply {
-            header(this, "📝 今日の点数", "›")
-            addView(if (score != null) big(score.total.toString(), "点") else text("－", 22f, sub, bold = true))
-            addView(text(score?.rank ?: "ごはんを記録すると点数が出ます", 12f, sub))
-            cal.pfcAdvice()?.let { addView(text(it, 12f, sub).apply { setPadding(0, px(6), 0, 0) }) }
-        }
+        c.addView(text("体調 ${ConditionStore.face(t.body)}", 22f).apply { setPadding(0, px(6), 0, 0) })
+        c.addView(text("気分 ${ConditionStore.face(t.mood)}", 22f))
+    }
+
+    private fun moneyTile(c: LinearLayout) {
+        val money = MoneyStore(a)
+        c.setOnClickListener { open(MoneyActivity::class.java) }
+        header(c, "💰 今月のお金", "›")
+        val total = money.monthTotal()
+        c.addView(big("%,d".format(total), "円"))
+        c.addView(text("予算 ${MoneyStore.yen(money.monthlyBudget)}", 12f, sub))
+        c.addView(bar(total.toDouble() / money.monthlyBudget.coerceAtLeast(1), "#5B9BD5"), LinearLayout.LayoutParams(-1, px(8)).apply { topMargin = px(8) })
+        val cal = Calendar.getInstance()
+        val daysLeft = cal.getActualMaximum(Calendar.DAY_OF_MONTH) - cal.get(Calendar.DAY_OF_MONTH) + 1
+        val left = money.monthlyBudget - total
+        c.addView(text(if (left >= 0) "1日 ${MoneyStore.yen(left / daysLeft)}までOK" else "予算オーバー中", 12f, sub).apply { setPadding(0, px(6), 0, 0) })
     }
 
     private fun careChips() {
         val c = card(col)
-        header(c, "🎀 メイドさんにおまかせ中")
-        val flow = FlowLayout(a).apply { setPadding(0, px(8), 0, 0) }
-        c.addView(flow)
-        fun chip(label: String, on: Boolean, onClick: () -> Unit) {
-            flow.addView(text(label, 13f, if (on) Color.WHITE else ink, bold = on).apply {
-                setBackgroundResource(if (on) R.drawable.chip_on_bg else R.drawable.chip_bg)
-                setPadding(px(12), px(7), px(12), px(7))
-                setOnClickListener { onClick() }
-            })
+        fun group(title: String, note: String, items: List<Triple<String, Boolean, () -> Unit>>) {
+            c.addView(text(title, 14f, sub, bold = true).apply { setPadding(0, if (c.childCount > 0) px(14) else 0, 0, 0) })
+            val flow = FlowLayout(a).apply { setPadding(0, px(8), 0, 0) }
+            for ((label, on, onClick) in items) {
+                flow.addView(text(label, 13f, if (on) Color.WHITE else ink, bold = on).apply {
+                    setBackgroundResource(if (on) R.drawable.chip_on_bg else R.drawable.chip_bg)
+                    setPadding(px(12), px(7), px(12), px(7))
+                    setOnClickListener { onClick() }
+                })
+            }
+            c.addView(flow)
+            c.addView(text(note, 11f, sub).apply { setPadding(0, px(6), 0, 0) })
         }
-        chip("☀️ 天気", prefs.careWeather) { prefs.careWeather = !prefs.careWeather; refresh() }
-        chip("🍙 健康", prefs.careCalorie) { prefs.careCalorie = !prefs.careCalorie; refresh() }
-        chip("💰 お金", prefs.careMoney) { prefs.careMoney = !prefs.careMoney; refresh() }
-        chip("🏠 おかえり", prefs.homeEnabled) { goSettings() }
-        chip("🔔 通知", prefs.announceApps.isNotEmpty() || prefs.paymentApps.isNotEmpty()) { open(IntegrationActivity::class.java) }
-        chip("🔒 ロック画面", prefs.lockScreenMaid) { prefs.lockScreenMaid = !prefs.lockScreenMaid; refresh() }
-        chip("🎈 ふわふわ", prefs.driftEnabled) { prefs.driftEnabled = !prefs.driftEnabled; refresh() }
-        c.addView(text("タップでオン・オフ（🏠と🔔は設定が開きます）", 11f, sub).apply { setPadding(0, px(8), 0, 0) })
+        group("🎀 おまかせする項目", "選んだものがホームに並んで、メイドさんがお話ししてくれます", listOf(
+            Triple("☀️ 天気", prefs.careWeather) { prefs.careWeather = !prefs.careWeather; refresh() },
+            Triple("🍙 カロリー", prefs.careCalorie) { prefs.careCalorie = !prefs.careCalorie; refresh() },
+            Triple("⚖️ 体重", prefs.careWeight) { prefs.careWeight = !prefs.careWeight; refresh() },
+            Triple("😊 調子", prefs.careCondition) { prefs.careCondition = !prefs.careCondition; refresh() },
+            Triple("💰 お金", prefs.careMoney) { prefs.careMoney = !prefs.careMoney; refresh() },
+        ))
+        group("🧹 メイドさんのお仕事", "🏠と🔔は設定が開きます", listOf(
+            Triple("🏠 おかえり", prefs.homeEnabled) { goSettings() },
+            Triple("🔔 通知", prefs.announceApps.isNotEmpty() || prefs.paymentApps.isNotEmpty()) { open(IntegrationActivity::class.java) },
+            Triple("🔒 ロック画面", prefs.lockScreenMaid) { prefs.lockScreenMaid = !prefs.lockScreenMaid; refresh() },
+            Triple("🎈 ふわふわ", prefs.driftEnabled) { prefs.driftEnabled = !prefs.driftEnabled; refresh() },
+        ))
     }
 }
 
