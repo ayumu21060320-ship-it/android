@@ -85,7 +85,7 @@ class MainActivity : Activity() {
         }
         val openCalorie = findViewById<Button>(R.id.openCalorie)
         openCalorie.visibility = if (prefs.careCalorie) View.VISIBLE else View.GONE
-        openCalorie.setOnClickListener { startActivity(Intent(this, CalorieActivity::class.java)) }
+        openCalorie.setOnClickListener { startActivity(Intent(this, HealthActivity::class.java)) }
         bindCheck(R.id.careCalorie, prefs.careCalorie) {
             prefs.careCalorie = it
             openCalorie.visibility = if (it) View.VISIBLE else View.GONE

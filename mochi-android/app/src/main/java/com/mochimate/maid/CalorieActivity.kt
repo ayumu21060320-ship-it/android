@@ -3,13 +3,9 @@ package com.mochimate.maid
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
 import android.view.Gravity
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
-import android.widget.RadioGroup
 import android.widget.TextView
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -35,7 +31,6 @@ class CalorieActivity : Activity() {
         say = findViewById(R.id.say)
         mochi.setOnClickListener { mochi.react(); say.text = store.line(prefs.masterName) }
         findViewById<TextView>(R.id.source).text = FoodDb.SOURCE
-        setupProfile()
         say.text = store.line(prefs.masterName)
     }
 
@@ -54,9 +49,7 @@ class CalorieActivity : Activity() {
         findViewById<RingView>(R.id.ring).set(t.kcal, store.goal)
         renderPfc(t)
         renderScore(t)
-        renderWeight()
         renderMeals()
-        refreshGoalText()
     }
 
     private fun renderScore(t: DayTotal) {
@@ -87,59 +80,6 @@ class CalorieActivity : Activity() {
         }
     }
 
-    private fun renderWeight() {
-        val ws = WeightStore(this)
-        val box = findViewById<LinearLayout>(R.id.weightCard)
-        box.removeAllViews()
-        val head = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        head.addView(TextView(this).apply {
-            text = "⚖️ 体重"; textSize = 16f; setTextColor(getColor(R.color.ink)); paint.isFakeBoldText = true
-        }, LinearLayout.LayoutParams(0, -2, 1f))
-        val last = ws.latest()
-        head.addView(TextView(this).apply {
-            text = last?.let { "${it.second} kg" } ?: "未記録"
-            textSize = 22f; setTextColor(getColor(R.color.ink)); paint.isFakeBoldText = true
-        })
-        box.addView(head)
-        val diff = ws.diffFromPrevious()
-        val t = ws.target
-        box.addView(TextView(this).apply {
-            text = buildString {
-                if (diff != null) append(if (diff <= 0) "前回より ${"%.1f".format(-diff)}kg 減" else "前回より ${"%.1f".format(diff)}kg 増")
-                if (t != null && last != null) {
-                    if (isNotEmpty()) append("　")
-                    append("目標 ${t}kg まで あと${"%.1f".format(kotlin.math.abs(last.second - t))}kg")
-                }
-                if (isEmpty()) append("毎日はかると、変化がグラフでわかります")
-            }
-            textSize = 13f; setTextColor(getColor(R.color.ink_sub)); setPadding(0, px(2), 0, 0)
-        })
-        val chart = WeightChartView(this).apply {
-            set(ws.all(), t, ws.prediction(), 30)
-            setOnClickListener { startActivity(Intent(this@CalorieActivity, WeightActivity::class.java)) }
-        }
-        box.addView(chart, LinearLayout.LayoutParams(-1, px(150)).apply { topMargin = px(6) })
-        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        fun btn(label: String, onClick: () -> Unit) = TextView(this).apply {
-            text = label; textSize = 14f; gravity = Gravity.CENTER
-            setTextColor(getColor(R.color.accent)); paint.isFakeBoldText = true
-            setBackgroundResource(R.drawable.button_sub_bg)
-            setOnClickListener { onClick() }
-        }
-        row.addView(btn("今日の体重を記録") {
-            WeightDialogs.record(this) {
-                refresh()
-                mochi.react()
-                say.text = WeightStore(this).line(prefs.masterName)
-                findViewById<EditText>(R.id.weight).setText(CalorieStore(this).weightKg.toString())
-            }
-        }, LinearLayout.LayoutParams(0, px(42), 1f))
-        row.addView(btn("グラフ・目標 ›") {
-            startActivity(Intent(this@CalorieActivity, WeightActivity::class.java))
-        }, LinearLayout.LayoutParams(0, px(42), 1f).apply { marginStart = px(8) })
-        box.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = px(8) })
-    }
-
     private fun renderPfc(t: DayTotal) {
         val box = findViewById<LinearLayout>(R.id.pfc)
         box.removeAllViews()
@@ -167,6 +107,14 @@ class CalorieActivity : Activity() {
         row("たんぱく質", "#E0566E", t.p, store.goalP)
         row("脂質", "#F2B84B", t.f, store.goalF)
         row("炭水化物", "#5B9BD5", t.c, store.goalC)
+        box.addView(TextView(this).apply {
+            text = "⚙️ 目標を変える（からだの設定）›"
+            textSize = 13f
+            setTextColor(getColor(R.color.accent))
+            gravity = Gravity.END
+            setPadding(0, px(8), 0, 0)
+            setOnClickListener { startActivity(Intent(this@CalorieActivity, BodySettingsActivity::class.java)) }
+        })
     }
 
     private fun renderMeals() {
@@ -230,52 +178,4 @@ class CalorieActivity : Activity() {
         }
     }
 
-    private fun setupProfile() {
-        findViewById<RadioGroup>(R.id.sex).apply {
-            check(if (store.isMale) R.id.male else R.id.female)
-            setOnCheckedChangeListener { _, id -> store.isMale = id == R.id.male; refresh() }
-        }
-        findViewById<RadioGroup>(R.id.activity).apply {
-            check(when (store.activity) { 0 -> R.id.actLow; 2 -> R.id.actHigh; else -> R.id.actMid })
-            setOnCheckedChangeListener { _, id ->
-                store.activity = when (id) { R.id.actLow -> 0; R.id.actHigh -> 2; else -> 1 }
-                refresh()
-            }
-        }
-        findViewById<RadioGroup>(R.id.plan).apply {
-            check(when (store.plan) { -1 -> R.id.planLose; 1 -> R.id.planGain; else -> R.id.planKeep })
-            setOnCheckedChangeListener { _, id ->
-                store.plan = when (id) { R.id.planLose -> -1; R.id.planGain -> 1; else -> 0 }
-                refresh()
-            }
-        }
-        bindNumber(R.id.age, store.age.toString()) { v -> v.toIntOrNull()?.takeIf { it in 5..120 }?.let { store.age = it } }
-        bindNumber(R.id.height, trim(store.heightCm)) { v -> v.toFloatOrNull()?.takeIf { it in 80f..250f }?.let { store.heightCm = it } }
-        bindNumber(R.id.weight, trim(store.weightKg)) { v -> v.toFloatOrNull()?.takeIf { it in 20f..300f }?.let { store.weightKg = it } }
-    }
-
-    private fun trim(f: Float) = if (f % 1f == 0f) f.toInt().toString() else f.toString()
-
-    private fun bindNumber(id: Int, initial: String, onValid: (String) -> Unit) {
-        findViewById<EditText>(id).apply {
-            setText(initial)
-            addTextChangedListener(object : TextWatcher {
-                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
-                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
-                override fun afterTextChanged(s: Editable?) {
-                    onValid(s?.toString().orEmpty())
-                    val t = store.total()
-                    findViewById<RingView>(R.id.ring).set(t.kcal, store.goal)
-                    renderPfc(t)
-                    refreshGoalText()
-                }
-            })
-        }
-    }
-
-    private fun refreshGoalText() {
-        findViewById<TextView>(R.id.goalText).text =
-            "1日の目標: ${store.goal} kcal（基礎代謝 ${store.bmr.toInt()} kcal）\n" +
-            "たんぱく質 ${store.goalP.roundToInt()}g・脂質 ${store.goalF.roundToInt()}g・炭水化物 ${store.goalC.roundToInt()}g"
-    }
 }

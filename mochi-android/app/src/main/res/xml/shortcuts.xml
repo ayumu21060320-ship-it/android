@@ -11,4 +11,14 @@
             android:targetPackage="com.mochimate.maid"
             android:targetClass="com.mochimate.maid.CalorieActivity" />
     </shortcut>
+    <shortcut
+        android:shortcutId="record_weight"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_weight">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.mochimate.maid"
+            android:targetClass="com.mochimate.maid.WeightActivity" />
+    </shortcut>
 </shortcuts>

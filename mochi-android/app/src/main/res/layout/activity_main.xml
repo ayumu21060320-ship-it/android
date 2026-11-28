@@ -214,7 +214,7 @@
                 android:layout_marginStart="32dp"
                 android:layout_marginBottom="8dp"
                 android:background="@drawable/button_sub_bg"
-                android:text="ごはんを記録する"
+                android:text="健康管理をひらく"
                 android:textColor="@color/accent"
                 android:textStyle="bold" />
 

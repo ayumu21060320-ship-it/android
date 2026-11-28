@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">もちもちメイド</string>
     <string name="shortcut_food">ごはんを記録</string>
+    <string name="shortcut_weight">体重を記録</string>
 </resources>

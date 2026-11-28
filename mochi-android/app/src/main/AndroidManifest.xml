@@ -56,6 +56,17 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".HealthActivity"
+            android:exported="false"
+            android:label="健康管理" />
+
+        <activity
+            android:name=".BodySettingsActivity"
+            android:exported="false"
+            android:label="からだの設定"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".WeightActivity"
             android:exported="false"
             android:label="体重" />
