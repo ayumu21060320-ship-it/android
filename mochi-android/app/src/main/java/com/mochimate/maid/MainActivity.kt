@@ -167,6 +167,7 @@ class MainActivity : Activity() {
             HomeGeofence.register(this) // 「常に許可」にして戻ってきた時に見守りを始める
         }
         MochiNotificationListener.ensureConnected(this)
+        GarbageAlarm.schedule(this)
         refresh()
         refreshTab()
     }

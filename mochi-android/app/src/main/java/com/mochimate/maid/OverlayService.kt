@@ -398,6 +398,7 @@ class OverlayService : Service() {
     /** ときどき「ふわふわ漂う」と「その場で休む」を切り替える */
     private fun updateMood() {
         val now = System.currentTimeMillis()
+        if (FocusService.running) { resting = true; targetVX = 0f; targetVY = 0f; return }
         if (now < nextMoodAt) return
         resting = if (resting) false else Random.nextInt(3) == 0
         if (resting) {
@@ -450,12 +451,24 @@ class OverlayService : Service() {
         if (rich != null) { dismissRich(); return }
         mochi?.react()
         val name = prefs.masterName
+        if (FocusService.running) {
+            val m = (FocusService.remainingMs() / 60_000L + 1)
+            talk(MochiLines.focusing(name, FocusService.label, m.toInt()))
+            return
+        }
         talkCount++
         // あいさつ → (天気) → (カロリー) → ふつうのおしゃべり、の順にくり返す
         // おまかせされている項目だけを話題にする。カロリー・体重・お金は吹き出しに小さなグラフをつける
         val topics = buildList<() -> Unit> {
             add { talk(MochiLines.greeting(name)) }
             if (prefs.careWeather) add { talkWeather() }
+            if (prefs.careGarbage) {
+                val today = GarbageStore(this@OverlayService).on(java.time.LocalDate.now())
+                val tomorrow = GarbageStore(this@OverlayService).on(java.time.LocalDate.now().plusDays(1))
+                val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+                if (today.isNotEmpty() && hour < 12) add { talk("今日は${GarbageStore.names(today)}の日ですよ！出しましたか？") }
+                else if (tomorrow.isNotEmpty() && hour >= 17) add { talk("明日は${GarbageStore.names(tomorrow)}の日です。忘れないでくださいね！") }
+            }
             if (prefs.careCalorie) add { talkWith(CalorieStore(this@OverlayService).line(name), BubbleVisuals::calorie) }
             if (prefs.careWeight) add { talkWith(WeightStore(this@OverlayService).line(name), BubbleVisuals::weight) }
             if (prefs.careCondition) add { talkCondition() }
@@ -584,6 +597,7 @@ class OverlayService : Service() {
             val now = java.util.Calendar.getInstance()
             val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(now.time)
             val hour = now.get(java.util.Calendar.HOUR_OF_DAY)
+            if (FocusService.running) { handler.postDelayed(this, 10 * 60_000); return }
             // 朝(6〜11時)に1回、今日の調子を聞く
             if (prefs.careCondition && hour in 6..11 && prefs.lastConditionAsk != today && rich == null &&
                 ConditionStore(this@OverlayService).get().body == null
@@ -810,6 +824,19 @@ class OverlayService : Service() {
             s.handler.post {
                 if (s.richSpec?.tag == tag) s.dismissRich()
                 if (s.card?.tag == tag) s.card?.dismiss()
+            }
+        }
+
+        /** 集中タイマーが始まった・終わった(集中中は動かず静かにする) */
+        fun focusChanged() {
+            val s = instance ?: return
+            s.handler.post {
+                if (FocusService.running) {
+                    s.stopFling(save = true)
+                    s.setBubbleVisible(false)
+                } else if (s.prefs.driftEnabled && !s.hidden) {
+                    s.startFling(0f, 0f)
+                }
             }
         }
 

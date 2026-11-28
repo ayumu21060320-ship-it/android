@@ -63,6 +63,31 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".GarbageActivity"
+            android:exported="false"
+            android:label="ゴミの日" />
+
+        <activity
+            android:name=".FocusActivity"
+            android:exported="false"
+            android:label="集中タイマー"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize" />
+
+        <receiver
+            android:name=".GarbageReceiver"
+            android:exported="false" />
+
+        <service
+            android:name=".FocusService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Focus (pomodoro) timer that keeps counting while the app is closed" />
+        </service>
+
+        <activity
             android:name=".ChatActivity"
             android:exported="false"
             android:label="リリ"

@@ -33,6 +33,16 @@ class Prefs(context: Context) {
         get() = sp.getString("condition_ask", null)
         set(value) = sp.edit().putString("condition_ask", value).apply()
 
+    /** ゴミの日のお世話 */
+    var careGarbage: Boolean
+        get() = sp.getBoolean("care_garbage", true)
+        set(value) = sp.edit().putBoolean("care_garbage", value).apply()
+
+    /** 集中タイマー(ホームにカード) */
+    var careFocus: Boolean
+        get() = sp.getBoolean("care_focus", true)
+        set(value) = sp.edit().putBoolean("care_focus", value).apply()
+
     var careMoney: Boolean
         get() = sp.getBoolean("care_money", false)
         set(value) = sp.edit().putBoolean("care_money", value).apply()

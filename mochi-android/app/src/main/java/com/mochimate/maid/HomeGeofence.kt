@@ -162,7 +162,10 @@ class HomeGeofenceReceiver : BroadcastReceiver() {
 class HomeBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
-            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> HomeGeofence.register(context)
+            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> {
+                HomeGeofence.register(context)
+                GarbageAlarm.schedule(context)
+            }
         }
     }
 }

@@ -152,6 +152,8 @@ class HomeTab(a: Activity, private val goSettings: () -> Unit) : TabUi(a) {
             if (prefs.careWeight) add(::weightTile)
             if (prefs.careCondition) add(::conditionTile)
             if (prefs.careMoney) add(::moneyTile)
+            if (prefs.careGarbage) add(::garbageTile)
+            if (prefs.careFocus) add(::focusTile)
         }
         if (tiles.isEmpty()) {
             card(col).apply {
@@ -242,6 +244,40 @@ class HomeTab(a: Activity, private val goSettings: () -> Unit) : TabUi(a) {
         c.addView(text("気分 ${ConditionStore.face(t.mood)}", 22f))
     }
 
+    private fun garbageTile(c: LinearLayout) {
+        val g = GarbageStore(a)
+        c.setOnClickListener { open(GarbageActivity::class.java) }
+        header(c, "🗑️ ゴミの日", "›")
+        if (g.rules().isEmpty()) {
+            c.addView(text("タップして、ゴミの種類と曜日を登録してね", 13f, sub).apply { setPadding(0, px(6), 0, 0) })
+            return
+        }
+        val today = g.on(LocalDate.now())
+        val tomorrow = g.on(LocalDate.now().plusDays(1))
+        c.addView(text("今日", 12f, sub).apply { setPadding(0, px(6), 0, 0) })
+        c.addView(text(if (today.isEmpty()) "なし" else today.joinToString("\n") { "${it.emoji} ${it.name}" }, 15f, bold = today.isNotEmpty()))
+        c.addView(text("明日", 12f, sub).apply { setPadding(0, px(6), 0, 0) })
+        c.addView(text(if (tomorrow.isEmpty()) "なし" else tomorrow.joinToString("\n") { "${it.emoji} ${it.name}" }, 15f, bold = tomorrow.isNotEmpty()))
+    }
+
+    private fun focusTile(c: LinearLayout) {
+        val f = FocusStore(a)
+        c.setOnClickListener { open(FocusActivity::class.java) }
+        header(c, "⏱️ 集中", "›")
+        if (FocusService.running) {
+            val m = FocusService.remainingMs() / 60_000L + 1
+            c.addView(text("集中中", 12f, a.getColor(R.color.accent), bold = true).apply { setPadding(0, px(6), 0, 0) })
+            c.addView(big(m.toString(), "分のこり"))
+            c.addView(text(FocusService.label, 12f, sub))
+            return
+        }
+        val today = f.minutesOn(LocalDate.now())
+        c.addView(text("今日", 12f, sub).apply { setPadding(0, px(6), 0, 0) })
+        c.addView(big(today.toString(), "分"))
+        c.addView(text("この1週間 ${FocusStore.hm(f.lastWeek().sumOf { it.second })}", 12f, sub))
+        c.addView(text("▶ はじめる", 13f, a.getColor(R.color.accent), bold = true).apply { setPadding(0, px(8), 0, 0) })
+    }
+
     private fun moneyTile(c: LinearLayout) {
         val money = MoneyStore(a)
         c.setOnClickListener { open(MoneyActivity::class.java) }
@@ -277,6 +313,8 @@ class HomeTab(a: Activity, private val goSettings: () -> Unit) : TabUi(a) {
             Triple("⚖️ 体重", prefs.careWeight) { prefs.careWeight = !prefs.careWeight; refresh() },
             Triple("😊 調子", prefs.careCondition) { prefs.careCondition = !prefs.careCondition; refresh() },
             Triple("💰 お金", prefs.careMoney) { prefs.careMoney = !prefs.careMoney; refresh() },
+            Triple("🗑️ ゴミの日", prefs.careGarbage) { prefs.careGarbage = !prefs.careGarbage; GarbageAlarm.schedule(a); refresh() },
+            Triple("⏱️ 集中", prefs.careFocus) { prefs.careFocus = !prefs.careFocus; refresh() },
         ))
         group("🧹 メイドさんのお仕事", "🏠と🔔は設定が開きます", listOf(
             Triple("🏠 おかえり", prefs.homeEnabled) { goSettings() },
