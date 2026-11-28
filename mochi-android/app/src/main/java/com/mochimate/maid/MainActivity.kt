@@ -41,6 +41,8 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_shell)
         prefs = Prefs(this)
         setupShell()
+        // はじめての時は、リリが生活のことを聞いてお世話を提案する
+        if (!prefs.onboarded) startActivity(Intent(this, OnboardingActivity::class.java))
 
         hello = findViewById(R.id.hello)
         permissionCard = findViewById(R.id.permissionCard)

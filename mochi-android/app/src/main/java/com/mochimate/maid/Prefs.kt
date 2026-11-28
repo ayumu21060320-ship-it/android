@@ -153,6 +153,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("hide_fullscreen", true)
         set(value) = sp.edit().putBoolean("hide_fullscreen", value).apply()
 
+    /** はじめての会話(お世話の提案)を済ませたか */
+    var onboarded: Boolean
+        get() = sp.getBoolean("onboarded", false)
+        set(value) = sp.edit().putBoolean("onboarded", value).apply()
+
     /** 勝手にふわふわ動き回るか */
     var driftEnabled: Boolean
         get() = sp.getBoolean("drift", true)

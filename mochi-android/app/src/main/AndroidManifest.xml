@@ -68,6 +68,12 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".OnboardingActivity"
+            android:exported="false"
+            android:label="リリ"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".TodoActivity"
             android:exported="false"
             android:label="やること"

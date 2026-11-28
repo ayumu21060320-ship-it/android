@@ -362,6 +362,11 @@ class HomeTab(a: Activity, private val goSettings: () -> Unit) : TabUi(a) {
             c.addView(flow)
             c.addView(text(note, 11f, sub).apply { setPadding(0, px(6), 0, 0) })
         }
+        c.addView(text("💬 リリと話して、お世話を見直す ›", 14f, a.getColor(R.color.accent), bold = true).apply {
+            setBackgroundResource(R.drawable.button_sub_bg)
+            setPadding(px(14), px(8), px(14), px(8))
+            setOnClickListener { a.startActivity(Intent(a, OnboardingActivity::class.java).putExtra(OnboardingActivity.EXTRA_REVIEW, true)) }
+        }, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = px(12) })
         group("🎀 おまかせする項目", "選んだものがホームに並んで、メイドさんがお話ししてくれます", listOf(
             Triple("☀️ 天気", prefs.careWeather) { prefs.careWeather = !prefs.careWeather; refresh() },
             Triple("🍙 カロリー", prefs.careCalorie) { prefs.careCalorie = !prefs.careCalorie; refresh() },
