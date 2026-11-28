@@ -58,6 +58,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("care_screen", true)
         set(value) = sp.edit().putBoolean("care_screen", value).apply()
 
+    /** 生活リズム(朝のあいさつ・寝る時間の声かけ・ホームの円グラフ) */
+    var careRoutine: Boolean
+        get() = sp.getBoolean("care_routine", true)
+        set(value) = sp.edit().putBoolean("care_routine", value).apply()
+
     var careMoney: Boolean
         get() = sp.getBoolean("care_money", false)
         set(value) = sp.edit().putBoolean("care_money", value).apply()

@@ -157,6 +157,7 @@ class HomeTab(a: Activity, private val goSettings: () -> Unit) : TabUi(a) {
             if (prefs.careGarbage) add(::garbageTile)
             if (prefs.careFocus) add(::focusTile)
             if (prefs.careScreenTime) add(::screenTile)
+            if (prefs.careRoutine) add(::routineTile)
         }
         if (tiles.isEmpty()) {
             card(col).apply {
@@ -245,6 +246,14 @@ class HomeTab(a: Activity, private val goSettings: () -> Unit) : TabUi(a) {
         }
         c.addView(text("体調 ${ConditionStore.face(t.body)}", 22f).apply { setPadding(0, px(6), 0, 0) })
         c.addView(text("気分 ${ConditionStore.face(t.mood)}", 22f))
+    }
+
+    private fun routineTile(c: LinearLayout) {
+        c.setOnClickListener { open(RoutineActivity::class.java) }
+        header(c, "🕰️ 生活リズム", "›")
+        val r = Routine.today(a)
+        c.addView(RoutineClockView(a).apply { set(r, if (Routine.isWeekend(LocalDate.now())) "休日" else "平日") },
+            LinearLayout.LayoutParams(-1, px(130)).apply { topMargin = px(4) })
     }
 
     private fun scheduleTile(c: LinearLayout) {
@@ -378,6 +387,7 @@ class HomeTab(a: Activity, private val goSettings: () -> Unit) : TabUi(a) {
             Triple("📅 予定", prefs.careSchedule) { prefs.careSchedule = !prefs.careSchedule; refresh() },
             Triple("✅ やること", prefs.careTodo) { prefs.careTodo = !prefs.careTodo; refresh() },
             Triple("📱 スマホ時間", prefs.careScreenTime) { prefs.careScreenTime = !prefs.careScreenTime; refresh() },
+            Triple("🕰️ 生活リズム", prefs.careRoutine) { prefs.careRoutine = !prefs.careRoutine; refresh() },
         ))
         group("🧹 メイドさんのお仕事", "🏠と🔔は設定が開きます", listOf(
             Triple("🏠 おかえり", prefs.homeEnabled) { goSettings() },

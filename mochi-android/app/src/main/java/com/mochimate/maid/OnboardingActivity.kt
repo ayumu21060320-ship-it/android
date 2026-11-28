@@ -56,6 +56,21 @@ class OnboardingActivity : Activity() {
             steps += ::askTone
         }
         steps += ::askLife
+        steps += {
+            say("朝は、だいたい何時ごろ起きます？") {
+                choose(listOf("6時前", "6時台", "7時台", "8時台", "9時以降")) { a ->
+                    val m = mapOf("6時前" to 330, "6時台" to 390, "7時台" to 450, "8時台" to 510, "9時以降" to 570)[a] ?: 450
+                    Routine.setSeed(this, "wake", m)
+                    say("夜は、何時ごろ寝ることが多いです？") {
+                        choose(listOf("23時前", "0時ごろ", "1時ごろ", "2時以降")) { b ->
+                            val s = mapOf("23時前" to 1350, "0時ごろ" to 0, "1時ごろ" to 60, "2時以降" to 150)[b] ?: 0
+                            Routine.setSeed(this, "sleep", s)
+                            say(if (b == "2時以降") "けっこう夜ふかしさんですね…！ちゃんと寝られるように、わたしも見守りますね。" else "わかりました！生活リズム、覚えておきますね。") { next() }
+                        }
+                    }
+                }
+            }
+        }
         steps += { askYesNo("care_diet", "ごはんとか体重のこと、気になってたりします？", listOf("ダイエットしたい", "健康的に食べたい", "とくにない")) { a -> if (a != "とくにない") wants += listOf("calorie", "weight", "condition") } }
         steps += { askYesNo("care_money", "お金のこと…ついつい使いすぎちゃうこと、あります？", listOf("ある…", "たまに", "ないかな")) { a -> if (a != "ないかな") wants += "money" } }
         steps += { askYesNo("care_plan", "予定とかやること、うっかり忘れちゃうことあります？", listOf("よくある", "たまに", "ないかな")) { a -> if (a != "ないかな") wants += listOf("schedule", "todo") } }

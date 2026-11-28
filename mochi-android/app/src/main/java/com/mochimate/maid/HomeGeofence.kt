@@ -103,11 +103,16 @@ object HomeGeofence {
             p.lastHomeEntered = entered
             p.lastHomeEventAt = now
             p.lastHomeSource = source
+            Routine.logHome(c, entered)
         }
         if (!entered && !p.homeSayGoodbye) return
 
         if (entered) {
-            val line = MochiLines.welcomeHome(p.masterName, MoneyStore(c).todayTotal().takeIf { p.careMoney })
+            var line = MochiLines.welcomeHome(p.masterName, MoneyStore(c).todayTotal().takeIf { p.careMoney })
+            // ふだんより1時間以上おそい帰りなら、ひと言そえる
+            val usualBack = Routine.today(c).back
+            val nowMin = java.time.LocalTime.now().let { it.hour * 60 + it.minute }
+            if (!test && usualBack != null && nowMin - usualBack >= 60) line = "今日はいつもより遅かったですね…おつかれさまでした。\n$line"
             deliver(c, line, "🏠 おかえりなさいませ")
         } else {
             // いってらっしゃい: 天気がわかれば傘のことも言う。

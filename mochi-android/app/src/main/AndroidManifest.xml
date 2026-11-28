@@ -74,6 +74,11 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".RoutineActivity"
+            android:exported="false"
+            android:label="生活リズム" />
+
+        <activity
             android:name=".TodoActivity"
             android:exported="false"
             android:label="やること"

@@ -100,6 +100,7 @@ class OverlayService : Service() {
         if (instance === this) instance = null
         runCatching { unregisterReceiver(batteryReceiver) }
         runCatching { unregisterReceiver(screenReceiver) }
+        runCatching { unregisterReceiver(unlockReceiver) }
         stopFullscreenProbe()
         homeWifi?.stop()
         card?.dismiss()
@@ -205,6 +206,7 @@ class OverlayService : Service() {
         }
         registerReceiver(batteryReceiver, filter)
         registerReceiver(screenReceiver, IntentFilter(Intent.ACTION_SCREEN_ON))
+        registerReceiver(unlockReceiver, IntentFilter(Intent.ACTION_USER_PRESENT))
         homeWifi = HomeWifiWatcher(this).also { it.start() }
         handler.postDelayed(dietReview, 60_000)
 
@@ -611,6 +613,18 @@ class OverlayService : Service() {
             // スマホの使いすぎ
             // (メイドさんが隠れている時は、通知で知らせる)
             ScreenTime.check(this@OverlayService)
+            // ふだん寝る時間をすぎてもスマホを使っていたら、1日1回声をかける
+            val sleepAt = Routine.today(this@OverlayService).sleep
+            val nowMin = hour * 60 + now.get(java.util.Calendar.MINUTE)
+            val pm = getSystemService(android.os.PowerManager::class.java)
+            if (prefs.careRoutine && sleepAt != null && pm?.isInteractive == true && !Routine.bedNudgedToday(this@OverlayService) && rich == null) {
+                val since = (nowMin - sleepAt + 1440) % 1440
+                if (since in 0..90) {
+                    Routine.markBedNudged(this@OverlayService)
+                    val wake = Routine.usual(this@OverlayService, Routine.isWeekend(java.time.LocalDate.now().plusDays(if (hour >= 12) 1 else 0))).wake
+                    talk("${prefs.masterName}、いつも寝てる時間ですよ…" + (wake?.let { "明日も${Routine.hhmm(it)}ごろ起きるなら、そろそろ寝ませんか？" } ?: "そろそろ寝ませんか？"))
+                }
+            }
             // 夜8時をすぎてやることが残っていたら、1日1回だけ声をかける
             val todo = TodoStore(this@OverlayService)
             val todayStr = java.time.LocalDate.now().toString()
@@ -635,6 +649,36 @@ class OverlayService : Service() {
             }
             handler.postDelayed(this, 10 * 60_000)
         }
+    }
+
+    // ---------- 生活リズム ----------
+
+    /** その日はじめてロックを外した時(朝4時〜12時)に、朝のあいさつと今日のまとめ */
+    private val unlockReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val hour = java.time.LocalTime.now().hour
+            if (!prefs.careRoutine || hour !in 4..11 || Routine.greetedToday(this@OverlayService)) return
+            Routine.markGreeted(this@OverlayService)
+            handler.postDelayed({ talk(morningLine()) }, 1500)
+        }
+    }
+
+    private fun morningLine(): String {
+        val c = this
+        val name = prefs.masterName
+        val now = java.time.LocalTime.now().let { it.hour * 60 + it.minute }
+        val usual = Routine.today(c).wake
+        val head = when {
+            usual != null && usual - now >= 45 -> "おはようございます、$name！今日はいつもより早起きですね♪"
+            usual != null && now - usual >= 60 -> "おはようございます、$name…今日はちょっとお寝坊さんですね？"
+            else -> "おはようございます、$name！"
+        }
+        val parts = ArrayList<String>()
+        if (prefs.careWeather) WeatherRepository.cachedToday(prefs)?.let { parts += "天気は${it.label} ${it.max.toInt()}℃" }
+        if (prefs.careGarbage) GarbageStore(c).on(java.time.LocalDate.now()).takeIf { it.isNotEmpty() }?.let { parts += "${GarbageStore.names(it)}の日" }
+        if (prefs.careSchedule) ScheduleStore(c).on(java.time.LocalDate.now()).takeIf { it.isNotEmpty() }?.let { parts += "予定が${it.size}つ（${it.first().timeText()} ${it.first().title}）" }
+        if (prefs.careTodo) TodoStore(c).today().count { !it.done }.takeIf { it > 0 }?.let { parts += "やることが${it}つ" }
+        return if (parts.isEmpty()) head else head + "\n今日は" + parts.joinToString("、") + "です。"
     }
 
     // ---------- 電池 ----------
