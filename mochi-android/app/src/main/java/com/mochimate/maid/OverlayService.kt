@@ -90,6 +90,7 @@ class OverlayService : Service() {
         MochiNotificationListener.ensureConnected(this)
         isRunning = true
         instance = this
+        applyHidden()
         return START_STICKY
     }
 
@@ -633,6 +634,7 @@ class OverlayService : Service() {
     // ---------- 吹き出し ----------
 
     private fun talk(text: String) {
+        if (hidden) return
         if (rich != null) dismissRich()
         val b = bubble ?: return
         b.text = text
@@ -681,10 +683,32 @@ class OverlayService : Service() {
         if (bubbleShown) wm.updateViewLayout(b, bubbleParams)
     }
 
+    // ---------- アプリを開いている間は隠れる ----------
+
+    private var hidden = false
+
+    private fun applyHidden() {
+        val m = mochi ?: return
+        val hide = appVisible
+        if (hide == hidden) return
+        hidden = hide
+        if (hide) {
+            stopFling(save = true)
+            setBubbleVisible(false)
+            handler.removeCallbacks(hideBubble)
+            dismissRich(resume = false)
+            card?.dismiss()
+            m.visibility = View.GONE
+        } else {
+            m.visibility = View.VISIBLE
+            if (prefs.driftEnabled) startFling(0f, 0f)
+        }
+    }
+
     // ---------- お知らせの吹き出し ----------
 
     private fun showRich(spec: CardSpec) {
-        if (mochi == null) return
+        if (mochi == null || hidden) return
         dismissRich(resume = false)
         setBubbleVisible(false)
         handler.removeCallbacks(hideBubble)
@@ -766,6 +790,8 @@ class OverlayService : Service() {
         /** お知らせを出す。ふだんはメイドさんの吹き出しで、設定によっては画面の上のカードで。 */
         fun showCard(spec: CardSpec): Boolean {
             val s = instance ?: return false
+            // アプリを開いている間はメイドさんが隠れているので、元の通知は消さずに残す
+            if (appVisible) return false
             s.handler.post {
                 if (s.prefs.cardAtTop) {
                     val c = s.card ?: NotifyCard(s, s.wm).also { s.card = it }
@@ -785,6 +811,16 @@ class OverlayService : Service() {
                 if (s.richSpec?.tag == tag) s.dismissRich()
                 if (s.card?.tag == tag) s.card?.dismiss()
             }
+        }
+
+        /** メイドさんのアプリの画面が開いているか(開いている間はホーム画面のメイドさんを隠す) */
+        @Volatile
+        private var appVisible = false
+
+        fun setAppVisible(visible: Boolean) {
+            appVisible = visible
+            val s = instance ?: return
+            s.handler.post { s.applyHidden() }
         }
 
         /** 家の Wi-Fi の設定が変わった時に、見張りをやり直す */
